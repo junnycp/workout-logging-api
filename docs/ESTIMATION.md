@@ -1,0 +1,25 @@
+# Time Estimate
+
+Estimated before implementation started (2026-10-02). Actuals will be filled in at the end for comparison.
+
+| # | Work item | Estimate (h) | Actual (h) |
+|---|-----------|--------------|------------|
+| 1 | Project setup: NestJS, Docker Compose, Prisma, config validation, structured logging, global error filter, lint | 3 – 4 | |
+| 2 | Schema, migrations, indexes, seed (muscle-group mapping + 50k-entry performance dataset) | 3 – 4 | |
+| 3 | Unit conversion module (registry-based) + unit tests | 1 – 1.5 | |
+| 4 | `POST` bulk workout logging: validation, transaction, idempotency, concurrent writes | 4 – 5 | |
+| 5 | `GET` workout history: partial name match, date range, muscle group, unit conversion, timezone, cursor pagination | 4 – 5 | |
+| 6 | Personal records (max weight, max volume, Epley 1RM, dates) + period comparison | 4 – 5 | |
+| 7 | Integration and edge-case tests (incl. concurrent bulk writes) | 4 – 5 | |
+| 8 | Performance check with `EXPLAIN ANALYZE` on the 50k dataset, index tuning | 1.5 – 2 | |
+| 9 | README: architecture diagram, setup, API docs, schema rationale, trade-offs, scaling | 3 | |
+| 10 | AI_WORKFLOW.md (logged continuously, finalized at the end) | 1 – 1.5 | |
+| 11 | Review, refactoring, buffer | 2 – 3 | |
+| 12 | Video walkthrough preparation and recording (15–20 min) | 2 – 3 | |
+| | **Total** | **33 – 43 (target ≈ 38 h, ~5 working days)** | |
+
+## Assumptions
+
+- PostgreSQL + NestJS + Prisma, as recorded in `CLAUDE.md`.
+- AI-assisted development (Claude Code) throughout; time for reviewing and correcting AI output is included in each item.
+- Main risks to the estimate: timezone/DST edge cases in period comparison, and concurrency tests against a real database.
