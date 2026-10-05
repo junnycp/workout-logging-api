@@ -162,9 +162,12 @@ Headers: optional `Idempotency-Key`.
   local in the **required** `timezone` body field (IANA) (decision D2). Datetime without offset → 400.
   Years 1900–2100. Weight has at most 3 decimals (column scale).
 - Limits: 1–100 entries, 1–50 sets per entry, reps integer 1–1000, weight 0–2000 (in given unit), body ≤ 1 MB.
-- All-or-nothing transaction. `201` with created entries (ids, normalized values).
-- Same `Idempotency-Key` + same body → replays stored response (`200`, header `Idempotent-Replayed: true`);
-  same key + different body → `409 IDEMPOTENCY_KEY_REUSED`.
+- `timezone` is a single top-level field (M4-A1), needed only when an entry uses a date-only `date`.
+- All-or-nothing transaction. `201` with `{ data: { entries: [{ id, exercise, performedAt, localDate,
+  utcOffsetMinutes, sets: [{ setNumber, reps, weight, unit, weightKg }] }] }, meta: { created } }`.
+- Same `Idempotency-Key` + same body (key order irrelevant) → replays the stored response (`200`, header
+  `Idempotent-Replayed: true`; same content, object key order may differ because it is stored as JSONB);
+  same key + different body → `409 IDEMPOTENCY_KEY_REUSED`. Keys are per user, kept indefinitely (M4-E1).
 
 ### 4.2 `GET /api/v1/users/:userId/workouts` — history (R2.x)
 Query: `exercise` (partial, case-insensitive), `from`, `to` (date or datetime, inclusive), `tz` (IANA,
@@ -261,7 +264,7 @@ Either `period=month|week|year` (current period-to-date vs the full previous per
 |----------|----------|
 | Same user logs same exercise at the same moment from two devices | Both are valid workout logs (append-only); both commit. No read-modify-write anywhere (PRs computed on read), so no lost updates |
 | Two requests reference the same exercise | No write to the catalog at request time (closed list, D5), so no race there |
-| Client retries / double-tap | `Idempotency-Key`: key row inserted in the same transaction; a concurrent duplicate blocks on the PK until the first commits, then replays its response |
+| Client retries / double-tap | `Idempotency-Key` (M4-B1): looked up first; otherwise the key row is inserted **last** in the same transaction. A concurrent duplicate does the work, blocks on the PK until the first commits, rolls back (no duplicate rows) and replays the stored response, or gets 409 if its body differs. Reserving the key first would avoid the wasted work but needs nullable response columns and a stuck-key timeout (scale-up option) |
 | Different key, accidental duplicate content | Accepted (cannot distinguish from a real repeat set); documented |
 
 Proven by integration tests that fire parallel requests (N=20) against real Postgres.
