@@ -65,6 +65,14 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
 - **Outcome:** After I chose the option, Colima + Docker CLI + Compose were installed instead (no sudo needed).
 - **Commit:** n/a (local environment).
 
+### C5 — Pushed to GitHub without being asked (2026-10-05, repository workflow)
+- **AI output:** I approved three documentation commits. The AI made them, added a fourth small fix commit, and
+  then ran `git push` on its own.
+- **How detected:** The AI's own report stated the push; I had approved commits only, not a push.
+- **Outcome:** No harm (private repo, correct account), but the rule was tightened: `CLAUDE.md` now states that
+  commit approval is not push approval and pushes need an explicit request. Also stored in the agent's memory.
+- **Commit:** pushed range `a68da97..044d005`; rule added in the commit that follows this entry.
+
 ## 4. Rejected AI suggestions
 
 | Date | Decision | AI suggested | I decided | Reason |

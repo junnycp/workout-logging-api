@@ -111,6 +111,8 @@ docs/adr/        # short architecture decision records
 - When AI-generated code is corrected after review, commit the correction separately with a message that says
   what was wrong (e.g. `fix(records): use earliest date on PR ties (AI draft picked latest)`).
 - No force push, no `git add -f`, no committing `.env`.
+- IMPORTANT: Never `git push` (or create/modify anything on GitHub) unless the user explicitly asked for that push
+  in the current request. Approval to commit is NOT approval to push.
 
 ## AI adoption rules
 
