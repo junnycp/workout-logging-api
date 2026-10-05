@@ -154,6 +154,18 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   reviewer's suggestion to add codes for 409/422 — services only throw `AppException` with explicit codes.
 - **Commit:** the `fix(...)` / `test(config)` commits after `92da5eb` on branch `m1`.
 
+### C13 — Catalog validation and sync gaps found by the M2 review (2026-10-05, M2 review)
+- **AI output:** The catalog parser and sync passed 52 unit and 16 integration tests.
+- **How detected:** The independent `technical-leader` review reproduced each issue with a throwaway spec:
+  1. (must-fix) duplicate exercise names passed validation because collisions were tracked by display name;
+     the seed would then fail with a raw P2002 instead of a readable catalog error;
+  2. exercises removed from the catalog still resolved by name, so they could still be logged (breaks D5);
+  3. NFKC could expand a valid name beyond the 100-character key column.
+- **Outcome:** Fixed with failing tests first. Not done, deliberately: a stable catalog key to survive
+  renames (design change, raised with the reviewer) and a composite FK to keep the copied set columns equal
+  to their entry (deferred to M4 as an integration assertion, to avoid an extra index on a 50k-row table).
+- **Commit:** `fix(exercises): reject duplicate names and overlong keys; retire stale names` on branch `m2`.
+
 ## 4. Rejected AI suggestions
 
 | Date | Decision | AI suggested | I decided | Reason |

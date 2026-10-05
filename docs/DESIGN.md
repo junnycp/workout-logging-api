@@ -134,7 +134,9 @@ Design notes (go into README):
   `npm run seed` / the compose `migrate` job. Aliases live in `exercise_names` (M2 refinement: one table and one
   trigram index serve lookup, partial match and suggestions). Logging an unknown exercise is rejected
   (`UNKNOWN_EXERCISE` + suggestions). Adding an exercise = edit JSON + re-sync; no code change. The sync never
-  deletes exercises (entries may reference them) and reports them as stale.
+  deletes exercises (entries may reference them): stale ones are reported and lose their names, so they can no
+  longer be logged. Exercises are matched by canonical name, so renaming one creates a new exercise and leaves
+  history on the old id — fix spellings by adding an alias instead of renaming (trade-off, see README).
 - **No `users` table**: brief says no auth, userId is a parameter. Validated format `^[A-Za-z0-9_-]{1,64}$`.
 
 ---
