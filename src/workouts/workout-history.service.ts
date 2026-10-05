@@ -62,7 +62,9 @@ export class WorkoutHistoryService {
     ]);
     const setsByEntry = new Map<string, HistorySetRow[]>();
     for (const set of sets) {
-      setsByEntry.set(set.entryId, [...(setsByEntry.get(set.entryId) ?? []), set]);
+      const list = setsByEntry.get(set.entryId);
+      if (list) list.push(set);
+      else setsByEntry.set(set.entryId, [set]);
     }
 
     const data: HistoryEntryDto[] = page.map((row) => ({
@@ -70,7 +72,7 @@ export class WorkoutHistoryService {
       performedAt: row.performedAt.toISOString(),
       localDate: localDateOf(row.performedAt, row.utcOffsetMinutes),
       utcOffsetMinutes: row.utcOffsetMinutes,
-      exercise: exercises.get(row.exerciseId) as ExerciseDetails,
+      exercise: exerciseOf(exercises, row.exerciseId),
       sets: (setsByEntry.get(row.id) ?? []).map((set) => presentSet(set, query.unit)),
     }));
     const last = page[page.length - 1] as (typeof page)[number];
@@ -153,7 +155,7 @@ export class WorkoutHistoryService {
       query.exercise === undefined ? undefined : this.exercises.matchIdsByName(query.exercise),
       query.muscleGroup === undefined
         ? undefined
-        : this.exercises.exerciseIdsForMuscleGroup(query.muscleGroup),
+        : this.exercises.exerciseIdsForMuscleGroup(query.muscleGroup.trim().toLowerCase()),
     ]);
     if (byMuscle === null) {
       const codes = await this.exercises.muscleGroupCodes();
@@ -168,6 +170,13 @@ export class WorkoutHistoryService {
     const muscle = new Set(byMuscle);
     return byName.filter((id) => muscle.has(id));
   }
+}
+
+/** Entries reference exercises by FK, so a miss means a broken invariant: fail loudly, not `undefined`. */
+function exerciseOf(exercises: Map<string, ExerciseDetails>, id: string): ExerciseDetails {
+  const exercise = exercises.get(id);
+  if (!exercise) throw new Error(`Exercise ${id} referenced by a workout entry was not found`);
+  return exercise;
 }
 
 /**
