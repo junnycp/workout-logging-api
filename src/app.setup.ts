@@ -1,6 +1,8 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import type { HttpLogger } from 'pino-http';
 import { mapBodyParserErrors } from './common/errors/body-parser-errors';
 import { notFoundFallback } from './common/errors/not-found.fallback';
+import { HTTP_LOGGER } from './common/logging/http-logger';
 import { requestIdMiddleware } from './common/logging/request-id.middleware';
 import { setupSwagger } from './common/openapi/swagger';
 
@@ -12,8 +14,9 @@ export const MAX_JSON_BODY = '1mb';
  * The app must be created with `{ bodyParser: false }` for the body limit to apply.
  */
 export async function setupApp(app: NestExpressApplication): Promise<NestExpressApplication> {
-  // Order matters: request id first, then the parser, then the parser-error mapper.
+  // Order matters: request id, access logging, then the parser and its error mapper.
   app.use(requestIdMiddleware);
+  app.use(app.get<HttpLogger>(HTTP_LOGGER));
   app.useBodyParser('json', { limit: MAX_JSON_BODY });
   app.use(mapBodyParserErrors);
   app.setGlobalPrefix(API_PREFIX, { exclude: ['health'] });
