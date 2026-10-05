@@ -158,8 +158,9 @@ Headers: optional `Idempotency-Key`.
   ]
 }
 ```
-- `date`: ISO-8601 datetime **with offset**, or date-only `YYYY-MM-DD` interpreted in the `timezone` body field
-  (IANA, default `UTC`) at 00:00 local (decision D2).
+- `date`: ISO-8601 datetime **with offset** (`Z` or `±hh:mm`), or date-only `YYYY-MM-DD` interpreted at 00:00
+  local in the **required** `timezone` body field (IANA) (decision D2). Datetime without offset → 400.
+  Years 1900–2100. Weight has at most 3 decimals (column scale).
 - Limits: 1–100 entries, 1–50 sets per entry, reps integer 1–1000, weight 0–2000 (in given unit), body ≤ 1 MB.
 - All-or-nothing transaction. `201` with created entries (ids, normalized values).
 - Same `Idempotency-Key` + same body → replays stored response (`200`, header `Idempotent-Replayed: true`);

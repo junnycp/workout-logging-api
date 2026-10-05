@@ -11,6 +11,11 @@ describe('pagination cursor', () => {
     expect(decodeCursor(encodeCursor(position))).toEqual(position);
   });
 
+  it('normalizes the id to lower case', () => {
+    const upper = encodeRaw({ p: '2026-10-01T11:30:00.123Z', i: position.id.toUpperCase() });
+    expect(decodeCursor(upper)?.id).toBe(position.id);
+  });
+
   it('is URL-safe and opaque', () => {
     expect(encodeCursor(position)).toMatch(/^[A-Za-z0-9_-]+$/);
   });

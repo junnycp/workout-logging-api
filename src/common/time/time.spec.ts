@@ -1,4 +1,5 @@
 import {
+  canonicalTimeZone,
   isValidTimeZone,
   localDateOf,
   parseWorkoutDate,
@@ -15,6 +16,22 @@ describe('isValidTimeZone', () => {
 
   it.each(['Mars/Base', '', '+07:00', 'local'])('rejects %j', (zone) => {
     expect(isValidTimeZone(zone)).toBe(false);
+  });
+});
+
+describe('canonicalTimeZone', () => {
+  it.each([
+    ['UTC', 'UTC'],
+    ['utc', 'UTC'],
+    ['Etc/UTC', 'UTC'],
+    ['Asia/Ho_Chi_Minh', 'Asia/Ho_Chi_Minh'], // not ICU's legacy alias "Asia/Saigon"
+    ['America/New_York', 'America/New_York'],
+  ])('maps %s to %s', (input, expected) => {
+    expect(canonicalTimeZone(input)).toBe(expected);
+  });
+
+  it('returns null for an unknown zone', () => {
+    expect(canonicalTimeZone('Mars/Base')).toBeNull();
   });
 });
 
@@ -71,6 +88,12 @@ describe('parseWorkoutDate (decision D2)', () => {
     ['offset beyond ±14:00', '2026-10-01T10:00:00+15:00'],
     ['free text', 'yesterday'],
     ['ISO week date', '2026-W40-4'],
+    ['offset minutes out of range', '2026-10-01T18:30:00+07:99'],
+    ['offset hours out of range', '2026-10-01T18:30:00+24:00'],
+    ['hour 24', '2026-10-01T24:00:00Z'],
+    ['lower-case designators', '2026-10-01t10:00:00z'],
+    ['year before 1900', '0000-01-01T00:00:00Z'],
+    ['year after 2100', '2101-01-01'],
     ['empty string', ''],
   ])('rejects %s', (_case, input) => {
     expect(parseWorkoutDate(input, 'UTC')).toEqual({ ok: false, error: 'INVALID_DATE' });
@@ -126,12 +149,13 @@ describe('resolveDateRange', () => {
 });
 
 describe('periodRanges ("this month vs last month")', () => {
-  it('uses calendar months in the requested timezone', () => {
+  it('compares the current period to date with the full previous period, in the requested timezone', () => {
     // 00:30 on 1 October in Hanoi is still 30 September in UTC.
-    const ranges = periodRanges('month', new Date('2026-09-30T17:30:00Z'), 'Asia/Ho_Chi_Minh');
+    const now = new Date('2026-09-30T17:30:00Z');
+    const ranges = periodRanges('month', now, 'Asia/Ho_Chi_Minh');
     expect([iso(ranges.current.gte), iso(ranges.current.lt)]).toEqual([
       '2026-09-30T17:00:00.000Z',
-      '2026-10-31T17:00:00.000Z',
+      '2026-09-30T17:30:00.001Z', // up to and including now: future-dated logs do not count
     ]);
     expect([iso(ranges.previous.gte), iso(ranges.previous.lt)]).toEqual([
       '2026-08-31T17:00:00.000Z',
@@ -158,6 +182,15 @@ describe('periodRanges ("this month vs last month")', () => {
     const ranges = periodRanges('year', new Date('2026-06-15T00:00:00Z'), 'UTC');
     expect(iso(ranges.previous.gte)).toBe('2025-01-01T00:00:00.000Z');
     expect(iso(ranges.previous.lt)).toBe('2026-01-01T00:00:00.000Z');
+  });
+});
+
+describe('invalid zones in internal helpers', () => {
+  it('throws instead of returning invalid dates', () => {
+    expect(() => periodRanges('month', new Date(), 'Nope/Zone')).toThrow(
+      'Invalid time zone: Nope/Zone',
+    );
+    expect(() => localDateOf(new Date(), 'Nope/Zone')).toThrow('Invalid time zone: Nope/Zone');
   });
 });
 

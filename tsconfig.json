@@ -20,6 +20,7 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
+    "allowUnreachableCode": false,
     "forceConsistentCasingInFileNames": true
   },
   "include": ["src", "test", "prisma", "*.ts"],

@@ -31,5 +31,5 @@ export function decodeCursor(cursor: string): CursorPosition | null {
   const performedAt = new Date(p);
   // Round-trip check: rejects non-ISO strings and dates JS would silently roll over (Feb 30 -> Mar 2).
   if (Number.isNaN(performedAt.getTime()) || performedAt.toISOString() !== p) return null;
-  return { performedAt, id: i };
+  return { performedAt, id: i.toLowerCase() };
 }

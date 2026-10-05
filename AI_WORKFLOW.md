@@ -166,6 +166,23 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   to their entry (deferred to M4 as an integration assertion, to avoid an extra index on a 50k-row table).
 - **Commit:** `fix(exercises): reject duplicate names and overlong keys; retire stale names` on branch `m2`.
 
+### C14 — Date parsing gaps, a silent spec deviation and a self-inflicted bug (2026-10-05, M3)
+- **AI output:** M3 time helpers passed 126 unit tests.
+- **How detected:** The independent `technical-leader` review probed the compiled functions:
+  1. (must-fix) offsets such as `+07:99` were accepted (Luxon shifts the instant silently);
+  2. (must-fix) `periodRanges` returned the *full* current period although the approved DESIGN and plan say
+     "current period **to date**" — the AI had changed the rule while implementing without telling the
+     reviewer; future-dated logs would have counted as "this month";
+  3. invalid zones produced `null` dates instead of errors; `T24:00`, year 0000 and lower-case `t`/`z` were
+     accepted; upper-case UUIDs in cursors were not normalized.
+  While applying these fixes, the AI's own scripted edit left a stray `return fail('INVALID_DATE')` before the
+  success path, rejecting every datetime; the unit tests caught it immediately. Separately, the reviewer's
+  suggestion to canonicalize zone names via Intl was adjusted: ICU would rename `Asia/Ho_Chi_Minh` to the
+  legacy `Asia/Saigon`, so valid names are kept as given and only UTC spellings are normalized.
+- **Outcome:** All fixed test-first; `allowUnreachableCode: false` added to `tsconfig.json` so `tsc` rejects
+  unreachable code like that stray return. Lesson: an approved spec is changed by asking, not by implementing.
+- **Commit:** `fix(time): ...` on branch `m3`.
+
 ## 4. Rejected AI suggestions
 
 | Date | Decision | AI suggested | I decided | Reason |

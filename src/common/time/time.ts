@@ -9,8 +9,13 @@ export type DateInputError =
   'INVALID_DATE' | 'MISSING_OFFSET' | 'MISSING_TIMEZONE' | 'INVALID_TIMEZONE';
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+// Strict ISO-8601 extended format: hours 00-23 (no "24:00"), upper-case T/Z, offset hours 00-23 and
+// minutes 00-59 (Luxon alone would accept "+07:99" and silently shift the instant).
 const DATE_TIME =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?<offset>Z|[+-]\d{2}:\d{2})?$/i;
+  /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,9})?)?(?<offset>Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)?$/;
+/** Plausible workout years; anything else is a typo or a client bug. */
+const MIN_YEAR = 1900;
+const MAX_YEAR = 2100;
 /** Same bound as the workout_entries_utc_offset_range CHECK constraint. */
 const MAX_OFFSET_MINUTES = 14 * 60;
 
@@ -19,8 +24,25 @@ const MAX_OFFSET_MINUTES = 14 * 60;
  * those are rejected on purpose: they carry no DST rules and "+" is decoded as a space in query strings.
  */
 export function isValidTimeZone(zone: string): boolean {
-  return zone === 'UTC' || (/^[A-Za-z]/.test(zone) && IANAZone.isValidZone(zone));
+  return canonicalTimeZone(zone) !== null;
 }
+
+/**
+ * The zone name to use and echo back, or null when invalid. UTC spellings ("utc", "Etc/UTC") become "UTC";
+ * other valid names are kept as given. ICU's canonical form is not used because it would turn
+ * "Asia/Ho_Chi_Minh" into the legacy alias "Asia/Saigon".
+ */
+export function canonicalTimeZone(zone: string): string | null {
+  if (!/^[A-Za-z]/.test(zone) || !IANAZone.isValidZone(zone)) return null;
+  return /^(etc\/)?(utc|uct|zulu|universal)$/i.test(zone) ? 'UTC' : zone;
+}
+
+const assertZone = (zone: string): void => {
+  if (!isValidTimeZone(zone)) throw new Error(`Invalid time zone: ${zone}`);
+};
+
+const inYearRange = (instant: DateTime): boolean =>
+  instant.year >= MIN_YEAR && instant.year <= MAX_YEAR;
 
 /** Start of the calendar day in `zone`; if midnight does not exist (DST gap), the first instant that does. */
 const startOfLocalDay = (date: string, zone: string): DateTime | null => {
@@ -35,14 +57,17 @@ function parseInstant(input: string, zone: string | undefined): Result<Instant, 
     if (zone === undefined) return fail('MISSING_TIMEZONE');
     if (!isValidTimeZone(zone)) return fail('INVALID_TIMEZONE');
     const start = startOfLocalDay(input, zone);
-    return start ? ok({ kind: 'date', instant: start }) : fail('INVALID_DATE');
+    return start && inYearRange(start)
+      ? ok({ kind: 'date', instant: start })
+      : fail('INVALID_DATE');
   }
   const match = DATE_TIME.exec(input);
   if (!match) return fail('INVALID_DATE');
   if (!match.groups?.offset) return fail('MISSING_OFFSET');
   const instant = DateTime.fromISO(input, { setZone: true });
-  if (!instant.isValid || Math.abs(instant.offset) > MAX_OFFSET_MINUTES)
+  if (!instant.isValid || Math.abs(instant.offset) > MAX_OFFSET_MINUTES || !inYearRange(instant)) {
     return fail('INVALID_DATE');
+  }
   return ok({ kind: 'datetime', instant });
 }
 
@@ -102,25 +127,27 @@ export function resolveDateRange(
 export type Period = 'week' | 'month' | 'year';
 
 /**
- * The calendar period containing `now` and the one before it, in `timezone` (weeks start on Monday).
- * Boundaries are local midnights, so DST and month lengths are handled by the calendar, not by adding hours.
+ * "This period vs the previous one" (DESIGN 4.4): the current calendar period up to and including `now`,
+ * and the full previous period, in `timezone` (weeks start on Monday). Future-dated logs never count as
+ * "this month". Boundaries are local midnights, so DST and month lengths come from the calendar.
  */
 export function periodRanges(
   period: Period,
   now: Date,
   timezone: string,
 ): { current: Required<InstantRange>; previous: Required<InstantRange> } {
+  assertZone(timezone);
   const currentStart = DateTime.fromJSDate(now, { zone: timezone }).startOf(period);
-  const nextStart = currentStart.plus({ [`${period}s`]: 1 }).startOf(period);
   const previousStart = currentStart.minus({ [`${period}s`]: 1 }).startOf(period);
   return {
-    current: { gte: currentStart.toJSDate(), lt: nextStart.toJSDate() },
+    current: { gte: currentStart.toJSDate(), lt: new Date(now.getTime() + 1) },
     previous: { gte: previousStart.toJSDate(), lt: currentStart.toJSDate() },
   };
 }
 
 /** Local calendar date (YYYY-MM-DD) of an instant, in an IANA zone or at a fixed UTC offset in minutes. */
 export function localDateOf(instant: Date, zoneOrOffsetMinutes: string | number): string {
+  if (typeof zoneOrOffsetMinutes === 'string') assertZone(zoneOrOffsetMinutes);
   const zone =
     typeof zoneOrOffsetMinutes === 'number'
       ? FixedOffsetZone.instance(zoneOrOffsetMinutes)
