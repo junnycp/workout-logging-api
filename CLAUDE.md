@@ -28,14 +28,14 @@ The git log and `AI_WORKFLOW.md` are deliverables. Follow "AI adoption rules" be
 ## Commands
 
 ```bash
-docker compose up --build        # full stack (api + postgres)
-npm run start:dev                # api only, needs DATABASE_URL
+nvm use                          # Node 24.21.0 from .nvmrc
+docker compose up --build        # full stack: postgres -> migrate (one-shot) -> api on :3000
+npm run start:dev                # api only, needs DATABASE_URL (e.g. the compose postgres on :5432)
 npm run lint && npm run typecheck
-npm test                         # unit tests
-npm run test:e2e                 # integration tests (needs Postgres)
+npm test                         # unit tests (Jest via node --experimental-vm-modules; plain `npx jest` fails)
+npm run test:e2e                 # integration tests, Testcontainers Postgres (Colima socket auto-detected)
+npm run prisma:generate          # regenerate src/generated/prisma after schema changes
 npx prisma migrate dev --name <change>   # new migration; never edit an applied migration
-npm run seed                     # sync exercise catalog + muscle-group mapping (idempotent)
-npm run seed:perf                # 50k-entry performance dataset
 ```
 
 Keep this section in sync with `package.json` when scripts change.
