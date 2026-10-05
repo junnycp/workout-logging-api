@@ -22,6 +22,8 @@ export interface WeightUnitRegistry {
   isSupported(code: string): boolean;
   toKg(value: Decimal, unit: string): Decimal;
   fromKg(kg: Decimal, unit: string): Decimal;
+  /** Exact conversion of a value as entered; identical units return it unchanged. Callers round. */
+  convert(value: Decimal, fromUnit: string, toUnit: string): Decimal;
 }
 
 export function createWeightUnitRegistry(
@@ -47,6 +49,11 @@ export function createWeightUnitRegistry(
     isSupported: (code) => factors.has(code),
     toKg: (value, unit) => value.times(factorOf(unit)),
     fromKg: (kg, unit) => kg.dividedBy(factorOf(unit)),
+    convert: (value, fromUnit, toUnit) => {
+      const from = factorOf(fromUnit);
+      const to = factorOf(toUnit);
+      return fromUnit === toUnit ? value : value.times(from).dividedBy(to);
+    },
   };
 }
 
