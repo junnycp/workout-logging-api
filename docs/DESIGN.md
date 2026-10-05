@@ -1,7 +1,6 @@
 # Design — Workout Logging API
 
 Status: approved 2026-10-05 (rev. 4). Source of truth for implementation; deviations require an ADR in `docs/adr/`.
-No code is written until approved.
 Date: 2026-10-02
 
 ---
