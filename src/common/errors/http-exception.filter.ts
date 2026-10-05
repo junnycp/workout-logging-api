@@ -2,7 +2,8 @@ import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from
 import type { Request, Response } from 'express';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { AppException } from './app-exception';
-import { ErrorCode, ErrorDetail, ErrorResponseBody } from './error-codes';
+import { errorBody } from './error-body';
+import { ErrorCode, ErrorDetail } from './error-codes';
 
 interface RenderedError {
   status: number;
@@ -38,11 +39,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
       this.logger.error({ err: exception, requestId }, 'Unhandled exception');
     }
 
-    const body: ErrorResponseBody = {
-      error: { code: rendered.code, message: rendered.message, details: rendered.details },
-      requestId,
-    };
-    http.getResponse<Response>().status(rendered.status).json(body);
+    http
+      .getResponse<Response>()
+      .status(rendered.status)
+      .json(errorBody(rendered.code, rendered.message, rendered.details, requestId));
   }
 
   private render(exception: unknown): RenderedError {
