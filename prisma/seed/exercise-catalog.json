@@ -1,0 +1,800 @@
+{
+  "version": 1,
+  "muscleGroups": [
+    {
+      "code": "chest",
+      "name": "Chest"
+    },
+    {
+      "code": "upper_back",
+      "name": "Upper back"
+    },
+    {
+      "code": "lats",
+      "name": "Lats"
+    },
+    {
+      "code": "traps",
+      "name": "Traps"
+    },
+    {
+      "code": "front_delts",
+      "name": "Front delts"
+    },
+    {
+      "code": "side_delts",
+      "name": "Side delts"
+    },
+    {
+      "code": "rear_delts",
+      "name": "Rear delts"
+    },
+    {
+      "code": "biceps",
+      "name": "Biceps"
+    },
+    {
+      "code": "triceps",
+      "name": "Triceps"
+    },
+    {
+      "code": "forearms",
+      "name": "Forearms"
+    },
+    {
+      "code": "abs",
+      "name": "Abs"
+    },
+    {
+      "code": "obliques",
+      "name": "Obliques"
+    },
+    {
+      "code": "lower_back",
+      "name": "Lower back"
+    },
+    {
+      "code": "glutes",
+      "name": "Glutes"
+    },
+    {
+      "code": "quads",
+      "name": "Quads"
+    },
+    {
+      "code": "hamstrings",
+      "name": "Hamstrings"
+    },
+    {
+      "code": "adductors",
+      "name": "Adductors"
+    },
+    {
+      "code": "calves",
+      "name": "Calves"
+    }
+  ],
+  "exercises": [
+    {
+      "name": "Bench Press",
+      "aliases": [
+        "Barbell Bench Press",
+        "Flat Bench Press",
+        "BB Bench"
+      ],
+      "primaryMuscles": [
+        "chest"
+      ],
+      "secondaryMuscles": [
+        "front_delts",
+        "triceps"
+      ]
+    },
+    {
+      "name": "Incline Bench Press",
+      "aliases": [
+        "Incline Barbell Bench Press"
+      ],
+      "primaryMuscles": [
+        "chest"
+      ],
+      "secondaryMuscles": [
+        "front_delts",
+        "triceps"
+      ]
+    },
+    {
+      "name": "Decline Bench Press",
+      "aliases": [
+        "Decline Barbell Bench Press"
+      ],
+      "primaryMuscles": [
+        "chest"
+      ],
+      "secondaryMuscles": [
+        "triceps"
+      ]
+    },
+    {
+      "name": "Dumbbell Bench Press",
+      "aliases": [
+        "DB Bench Press",
+        "Flat Dumbbell Press"
+      ],
+      "primaryMuscles": [
+        "chest"
+      ],
+      "secondaryMuscles": [
+        "front_delts",
+        "triceps"
+      ]
+    },
+    {
+      "name": "Incline Dumbbell Press",
+      "aliases": [
+        "Incline DB Press"
+      ],
+      "primaryMuscles": [
+        "chest"
+      ],
+      "secondaryMuscles": [
+        "front_delts",
+        "triceps"
+      ]
+    },
+    {
+      "name": "Dumbbell Fly",
+      "aliases": [
+        "DB Fly",
+        "Dumbbell Flye"
+      ],
+      "primaryMuscles": [
+        "chest"
+      ],
+      "secondaryMuscles": [
+        "front_delts"
+      ]
+    },
+    {
+      "name": "Cable Crossover",
+      "aliases": [
+        "Cable Fly",
+        "Cable Flye"
+      ],
+      "primaryMuscles": [
+        "chest"
+      ],
+      "secondaryMuscles": [
+        "front_delts"
+      ]
+    },
+    {
+      "name": "Machine Chest Press",
+      "aliases": [
+        "Chest Press"
+      ],
+      "primaryMuscles": [
+        "chest"
+      ],
+      "secondaryMuscles": [
+        "triceps"
+      ]
+    },
+    {
+      "name": "Push-Up",
+      "aliases": [
+        "Push Up",
+        "Pushup",
+        "Press-Up"
+      ],
+      "primaryMuscles": [
+        "chest"
+      ],
+      "secondaryMuscles": [
+        "triceps",
+        "front_delts"
+      ]
+    },
+    {
+      "name": "Dips",
+      "aliases": [
+        "Dip",
+        "Parallel Bar Dip"
+      ],
+      "primaryMuscles": [
+        "triceps",
+        "chest"
+      ],
+      "secondaryMuscles": [
+        "front_delts"
+      ]
+    },
+    {
+      "name": "Deadlift",
+      "aliases": [
+        "Conventional Deadlift",
+        "Barbell Deadlift"
+      ],
+      "primaryMuscles": [
+        "hamstrings",
+        "glutes",
+        "lower_back"
+      ],
+      "secondaryMuscles": [
+        "traps",
+        "forearms",
+        "quads"
+      ]
+    },
+    {
+      "name": "Romanian Deadlift",
+      "aliases": [
+        "RDL"
+      ],
+      "primaryMuscles": [
+        "hamstrings",
+        "glutes"
+      ],
+      "secondaryMuscles": [
+        "lower_back"
+      ]
+    },
+    {
+      "name": "Sumo Deadlift",
+      "aliases": [],
+      "primaryMuscles": [
+        "glutes",
+        "hamstrings",
+        "adductors"
+      ],
+      "secondaryMuscles": [
+        "quads",
+        "lower_back"
+      ]
+    },
+    {
+      "name": "Pull-Up",
+      "aliases": [
+        "Pull Up",
+        "Pullup"
+      ],
+      "primaryMuscles": [
+        "lats"
+      ],
+      "secondaryMuscles": [
+        "biceps",
+        "upper_back"
+      ]
+    },
+    {
+      "name": "Chin-Up",
+      "aliases": [
+        "Chin Up",
+        "Chinup"
+      ],
+      "primaryMuscles": [
+        "lats",
+        "biceps"
+      ],
+      "secondaryMuscles": [
+        "upper_back"
+      ]
+    },
+    {
+      "name": "Lat Pulldown",
+      "aliases": [
+        "Lat Pull-Down",
+        "Pulldown"
+      ],
+      "primaryMuscles": [
+        "lats"
+      ],
+      "secondaryMuscles": [
+        "biceps",
+        "upper_back"
+      ]
+    },
+    {
+      "name": "Barbell Row",
+      "aliases": [
+        "Bent-Over Row",
+        "Bent Over Barbell Row",
+        "Pendlay Row"
+      ],
+      "primaryMuscles": [
+        "upper_back",
+        "lats"
+      ],
+      "secondaryMuscles": [
+        "biceps",
+        "rear_delts",
+        "lower_back"
+      ]
+    },
+    {
+      "name": "Dumbbell Row",
+      "aliases": [
+        "One-Arm Dumbbell Row",
+        "DB Row"
+      ],
+      "primaryMuscles": [
+        "lats",
+        "upper_back"
+      ],
+      "secondaryMuscles": [
+        "biceps",
+        "rear_delts"
+      ]
+    },
+    {
+      "name": "Seated Cable Row",
+      "aliases": [
+        "Cable Row",
+        "Seated Row"
+      ],
+      "primaryMuscles": [
+        "upper_back",
+        "lats"
+      ],
+      "secondaryMuscles": [
+        "biceps"
+      ]
+    },
+    {
+      "name": "T-Bar Row",
+      "aliases": [
+        "T Bar Row"
+      ],
+      "primaryMuscles": [
+        "upper_back",
+        "lats"
+      ],
+      "secondaryMuscles": [
+        "biceps"
+      ]
+    },
+    {
+      "name": "Face Pull",
+      "aliases": [
+        "Cable Face Pull"
+      ],
+      "primaryMuscles": [
+        "rear_delts"
+      ],
+      "secondaryMuscles": [
+        "upper_back",
+        "traps"
+      ]
+    },
+    {
+      "name": "Barbell Shrug",
+      "aliases": [
+        "Shrug",
+        "Shrugs"
+      ],
+      "primaryMuscles": [
+        "traps"
+      ],
+      "secondaryMuscles": [
+        "forearms"
+      ]
+    },
+    {
+      "name": "Back Extension",
+      "aliases": [
+        "Hyperextension",
+        "45 Degree Back Extension"
+      ],
+      "primaryMuscles": [
+        "lower_back"
+      ],
+      "secondaryMuscles": [
+        "glutes",
+        "hamstrings"
+      ]
+    },
+    {
+      "name": "Overhead Press",
+      "aliases": [
+        "OHP",
+        "Military Press",
+        "Standing Barbell Press"
+      ],
+      "primaryMuscles": [
+        "front_delts"
+      ],
+      "secondaryMuscles": [
+        "side_delts",
+        "triceps"
+      ]
+    },
+    {
+      "name": "Seated Dumbbell Shoulder Press",
+      "aliases": [
+        "Dumbbell Shoulder Press",
+        "DB Shoulder Press"
+      ],
+      "primaryMuscles": [
+        "front_delts"
+      ],
+      "secondaryMuscles": [
+        "side_delts",
+        "triceps"
+      ]
+    },
+    {
+      "name": "Arnold Press",
+      "aliases": [],
+      "primaryMuscles": [
+        "front_delts",
+        "side_delts"
+      ],
+      "secondaryMuscles": [
+        "triceps"
+      ]
+    },
+    {
+      "name": "Lateral Raise",
+      "aliases": [
+        "Dumbbell Lateral Raise",
+        "Side Raise"
+      ],
+      "primaryMuscles": [
+        "side_delts"
+      ],
+      "secondaryMuscles": []
+    },
+    {
+      "name": "Front Raise",
+      "aliases": [
+        "Dumbbell Front Raise"
+      ],
+      "primaryMuscles": [
+        "front_delts"
+      ],
+      "secondaryMuscles": []
+    },
+    {
+      "name": "Rear Delt Fly",
+      "aliases": [
+        "Reverse Fly",
+        "Reverse Dumbbell Fly"
+      ],
+      "primaryMuscles": [
+        "rear_delts"
+      ],
+      "secondaryMuscles": [
+        "upper_back"
+      ]
+    },
+    {
+      "name": "Upright Row",
+      "aliases": [
+        "Barbell Upright Row"
+      ],
+      "primaryMuscles": [
+        "side_delts",
+        "traps"
+      ],
+      "secondaryMuscles": [
+        "biceps"
+      ]
+    },
+    {
+      "name": "Barbell Curl",
+      "aliases": [
+        "BB Curl",
+        "Standing Barbell Curl"
+      ],
+      "primaryMuscles": [
+        "biceps"
+      ],
+      "secondaryMuscles": [
+        "forearms"
+      ]
+    },
+    {
+      "name": "Dumbbell Curl",
+      "aliases": [
+        "DB Curl",
+        "Bicep Curl",
+        "Biceps Curl"
+      ],
+      "primaryMuscles": [
+        "biceps"
+      ],
+      "secondaryMuscles": [
+        "forearms"
+      ]
+    },
+    {
+      "name": "Hammer Curl",
+      "aliases": [
+        "Dumbbell Hammer Curl"
+      ],
+      "primaryMuscles": [
+        "biceps",
+        "forearms"
+      ],
+      "secondaryMuscles": []
+    },
+    {
+      "name": "Preacher Curl",
+      "aliases": [
+        "EZ Bar Preacher Curl"
+      ],
+      "primaryMuscles": [
+        "biceps"
+      ],
+      "secondaryMuscles": []
+    },
+    {
+      "name": "Triceps Pushdown",
+      "aliases": [
+        "Tricep Pushdown",
+        "Cable Pushdown",
+        "Rope Pushdown"
+      ],
+      "primaryMuscles": [
+        "triceps"
+      ],
+      "secondaryMuscles": []
+    },
+    {
+      "name": "Skull Crusher",
+      "aliases": [
+        "Lying Triceps Extension",
+        "Skullcrusher"
+      ],
+      "primaryMuscles": [
+        "triceps"
+      ],
+      "secondaryMuscles": []
+    },
+    {
+      "name": "Overhead Triceps Extension",
+      "aliases": [
+        "Overhead Tricep Extension"
+      ],
+      "primaryMuscles": [
+        "triceps"
+      ],
+      "secondaryMuscles": []
+    },
+    {
+      "name": "Close-Grip Bench Press",
+      "aliases": [
+        "Close Grip Bench Press",
+        "CGBP"
+      ],
+      "primaryMuscles": [
+        "triceps"
+      ],
+      "secondaryMuscles": [
+        "chest",
+        "front_delts"
+      ]
+    },
+    {
+      "name": "Wrist Curl",
+      "aliases": [
+        "Barbell Wrist Curl"
+      ],
+      "primaryMuscles": [
+        "forearms"
+      ],
+      "secondaryMuscles": []
+    },
+    {
+      "name": "Back Squat",
+      "aliases": [
+        "Squat",
+        "Barbell Squat",
+        "Barbell Back Squat"
+      ],
+      "primaryMuscles": [
+        "quads",
+        "glutes"
+      ],
+      "secondaryMuscles": [
+        "hamstrings",
+        "adductors",
+        "lower_back"
+      ]
+    },
+    {
+      "name": "Front Squat",
+      "aliases": [
+        "Barbell Front Squat"
+      ],
+      "primaryMuscles": [
+        "quads"
+      ],
+      "secondaryMuscles": [
+        "glutes",
+        "abs"
+      ]
+    },
+    {
+      "name": "Goblet Squat",
+      "aliases": [],
+      "primaryMuscles": [
+        "quads",
+        "glutes"
+      ],
+      "secondaryMuscles": [
+        "adductors"
+      ]
+    },
+    {
+      "name": "Leg Press",
+      "aliases": [
+        "Machine Leg Press",
+        "45 Degree Leg Press"
+      ],
+      "primaryMuscles": [
+        "quads",
+        "glutes"
+      ],
+      "secondaryMuscles": [
+        "hamstrings"
+      ]
+    },
+    {
+      "name": "Bulgarian Split Squat",
+      "aliases": [
+        "BSS",
+        "Rear-Foot-Elevated Split Squat"
+      ],
+      "primaryMuscles": [
+        "quads",
+        "glutes"
+      ],
+      "secondaryMuscles": [
+        "adductors"
+      ]
+    },
+    {
+      "name": "Walking Lunge",
+      "aliases": [
+        "Lunge",
+        "Lunges",
+        "Dumbbell Lunge"
+      ],
+      "primaryMuscles": [
+        "quads",
+        "glutes"
+      ],
+      "secondaryMuscles": [
+        "hamstrings"
+      ]
+    },
+    {
+      "name": "Leg Extension",
+      "aliases": [
+        "Machine Leg Extension"
+      ],
+      "primaryMuscles": [
+        "quads"
+      ],
+      "secondaryMuscles": []
+    },
+    {
+      "name": "Lying Leg Curl",
+      "aliases": [
+        "Leg Curl",
+        "Hamstring Curl"
+      ],
+      "primaryMuscles": [
+        "hamstrings"
+      ],
+      "secondaryMuscles": []
+    },
+    {
+      "name": "Seated Leg Curl",
+      "aliases": [],
+      "primaryMuscles": [
+        "hamstrings"
+      ],
+      "secondaryMuscles": []
+    },
+    {
+      "name": "Hip Thrust",
+      "aliases": [
+        "Barbell Hip Thrust"
+      ],
+      "primaryMuscles": [
+        "glutes"
+      ],
+      "secondaryMuscles": [
+        "hamstrings"
+      ]
+    },
+    {
+      "name": "Hip Adduction",
+      "aliases": [
+        "Adductor Machine"
+      ],
+      "primaryMuscles": [
+        "adductors"
+      ],
+      "secondaryMuscles": []
+    },
+    {
+      "name": "Standing Calf Raise",
+      "aliases": [
+        "Calf Raise",
+        "Calf Raises"
+      ],
+      "primaryMuscles": [
+        "calves"
+      ],
+      "secondaryMuscles": []
+    },
+    {
+      "name": "Seated Calf Raise",
+      "aliases": [],
+      "primaryMuscles": [
+        "calves"
+      ],
+      "secondaryMuscles": []
+    },
+    {
+      "name": "Plank",
+      "aliases": [
+        "Front Plank"
+      ],
+      "primaryMuscles": [
+        "abs"
+      ],
+      "secondaryMuscles": [
+        "obliques"
+      ]
+    },
+    {
+      "name": "Hanging Leg Raise",
+      "aliases": [
+        "Leg Raise"
+      ],
+      "primaryMuscles": [
+        "abs"
+      ],
+      "secondaryMuscles": [
+        "obliques"
+      ]
+    },
+    {
+      "name": "Cable Crunch",
+      "aliases": [
+        "Kneeling Cable Crunch"
+      ],
+      "primaryMuscles": [
+        "abs"
+      ],
+      "secondaryMuscles": []
+    },
+    {
+      "name": "Russian Twist",
+      "aliases": [],
+      "primaryMuscles": [
+        "obliques"
+      ],
+      "secondaryMuscles": [
+        "abs"
+      ]
+    },
+    {
+      "name": "Ab Wheel Rollout",
+      "aliases": [
+        "Ab Rollout",
+        "Ab Wheel"
+      ],
+      "primaryMuscles": [
+        "abs"
+      ],
+      "secondaryMuscles": [
+        "lats"
+      ]
+    }
+  ]
+}
