@@ -1,6 +1,6 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { PinoLogger } from 'nestjs-pino';
 import { AppException } from './app-exception';
 import { errorBody } from './error-body';
 import { ErrorCode, ErrorDetail } from './error-codes';
@@ -27,7 +27,11 @@ const STATUS_CODES: Partial<Record<number, ErrorCode>> = {
  */
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
-  constructor(@InjectPinoLogger(HttpExceptionFilter.name) private readonly logger: PinoLogger) {}
+  // Plain PinoLogger injection: @InjectPinoLogger only works for classes imported before
+  // LoggerModule.forRoot*() runs, which silently depends on import order.
+  constructor(private readonly logger: PinoLogger) {
+    logger.setContext(HttpExceptionFilter.name);
+  }
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const http = host.switchToHttp();

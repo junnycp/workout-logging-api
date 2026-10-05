@@ -125,6 +125,18 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   shared `errorBody()` keeps one shape, and the health controller now really logs failing dependencies.
 - **Commit:** `fix(common): ...` and `feat(health): ...` on branch `m1`.
 
+### C11 — Committed a health endpoint that broke application startup (2026-10-05, M1 health)
+- **AI output:** Commit `e820565` injected the logger with `@InjectPinoLogger(HealthController.name)`. The AI ran
+  lint, typecheck and build (all green) but committed before reading the result of its live check, which was
+  `[000]`: the app no longer started.
+- **How detected:** The AI noticed the `[000]` right after committing, and the log showed Nest could not resolve
+  the logger. `@InjectPinoLogger` providers are only created for classes decorated *before*
+  `LoggerModule.forRootAsync()` is evaluated; the exception filter worked only because its import sorted earlier.
+- **Outcome:** Both classes now inject `PinoLogger` directly and call `setContext()` (no import-order dependency).
+  Fixed in a separate commit rather than rewriting history. Lesson: static checks do not prove the app boots;
+  the e2e boot test planned for M1 is the safety net, and live-check results must be read before committing.
+- **Commit:** `fix(health): ...` after `e820565` on branch `m1`.
+
 ## 4. Rejected AI suggestions
 
 | Date | Decision | AI suggested | I decided | Reason |

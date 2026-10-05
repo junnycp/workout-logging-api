@@ -1,6 +1,6 @@
 import { Controller, Get, HttpStatus, ServiceUnavailableException } from '@nestjs/common';
 import { HealthCheck, HealthCheckResult, HealthCheckService } from '@nestjs/terminus';
-import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { PinoLogger } from 'nestjs-pino';
 import { AppException } from '../common/errors/app-exception';
 import { ErrorCode } from '../common/errors/error-codes';
 import { DatabaseHealthIndicator } from './database.health';
@@ -10,8 +10,10 @@ export class HealthController {
   constructor(
     private readonly health: HealthCheckService,
     private readonly database: DatabaseHealthIndicator,
-    @InjectPinoLogger(HealthController.name) private readonly logger: PinoLogger,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    logger.setContext(HealthController.name);
+  }
 
   /** Liveness + readiness: 200 when every dependency answers, 503 with the failing ones otherwise. */
   @Get()

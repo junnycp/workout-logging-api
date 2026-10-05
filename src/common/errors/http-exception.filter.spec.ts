@@ -19,7 +19,7 @@ function hostFor(request: object) {
 }
 
 function catchWith(exception: unknown, request: object = { id: 'req-1' }) {
-  const logger = { error: jest.fn() } as unknown as PinoLogger;
+  const logger = { error: jest.fn(), setContext: jest.fn() } as unknown as PinoLogger;
   const { host, response } = hostFor(request);
   new HttpExceptionFilter(logger).catch(exception, host);
   const [[status]] = response.status.mock.calls as [[number]];
