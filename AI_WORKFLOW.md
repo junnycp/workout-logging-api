@@ -200,6 +200,18 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   matching is strict (a case-only change of `exerciseName` is a different body → 409).
 - **Commit:** `7d44589`.
 
+### C16 — A proposed rounding fix that would have introduced double rounding (2026-10-05, pre-M5 check)
+- **AI output:** The pre-M5 verification found that POST rounds `weightKg` from the exact conversion while the
+  planned history endpoint would round the stored 4-decimal `weight_kg`, so the two could differ by 0.01
+  (`0.496 lb` → 0.22 vs 0.23). The AI proposed making POST read the stored value too, and I approved it.
+- **How detected:** By the AI, before implementing: while searching for a realistic weight for the test, it
+  compared both results with the exact value. The proposed fix makes the endpoints agree on the wrong
+  number: 32 lb = 14.51495584 kg → 14.51 correctly, but 14.5150 (stored) → 14.52. It stopped and asked again.
+- **Outcome:** I chose the alternative: POST stays as it is (it was correct). Responses are always recomputed
+  from the original `reps`/`weight`/`unit` with the domain functions and rounded once; stored kg columns only
+  filter, sort and select PRs. Rule added to DESIGN §5 and CLAUDE.md; an e2e test pins 32 lb → 14.51.
+- **Commit:** `28e7f17`.
+
 ## 4. Rejected AI suggestions
 
 | Date | Decision | AI suggested | I decided | Reason |
