@@ -112,6 +112,18 @@ describe('POST /api/v1/users/:userId/workouts (e2e)', () => {
       }
     });
 
+    it('rounds the response kg from the exact conversion, not from the 4-decimal stored value', async () => {
+      // 32 lb = 14.51495584 kg: stored as 14.5150, but rounding that again would answer 14.52.
+      const userId = uniqueUserId();
+      const res = await post(userId, {
+        entries: [bench({ sets: [{ reps: 1, weight: 32, unit: 'lb' }] })],
+      }).expect(201);
+
+      expect((res.body as CreatedBody).data.entries[0]?.sets[0]?.weightKg).toBe(14.51);
+      const stored = await prisma.workoutSet.findFirstOrThrow({ where: { userId } });
+      expect(stored.weightKg.toString()).toBe('14.515');
+    });
+
     it('accepts bodyweight sets (weight 0)', async () => {
       await post(uniqueUserId(), {
         entries: [bench({ exerciseName: 'Pull-Up', sets: [{ reps: 10, weight: 0, unit: 'kg' }] })],
