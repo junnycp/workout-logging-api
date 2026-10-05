@@ -35,8 +35,11 @@ The table above is kept unchanged as the pre-start estimate. After the design wa
 | 2 | Schema, migrations, seed | 3 – 4 | 3.5 – 5 | Closed exercise catalog (~50 exercises with aliases) and an idempotent sync script (D5) |
 | 4 | `POST` bulk logging | 4 – 5 | 4 – 5 | `UNKNOWN_EXERCISE` suggestions added; exercise auto-create race no longer needed (net zero) |
 | 5 | `GET` history | 4 – 5 | 4.5 – 5.5 | Prisma's native cursor is O(depth); keyset page needs a typed raw query |
-| 3, 6–12 | All other items | 22.5 – 29 | 22.5 – 29 | Unchanged (CI and a catalog endpoint were dropped, but neither was in the original estimate) |
-| | **Total** | **33 – 43** | **34.5 – 45 (target ≈ 39.5 h, ~5 working days)** | |
+| 3, 6–12 | All other items | 18.5 – 24 | 18.5 – 24 | Unchanged (CI and a catalog endpoint were dropped, but neither was in the original estimate) |
+| | **Total** | **32.5 – 42** (see note) | **34 – 44 (target ≈ 39 h, ~5 working days)** | |
+
+Note: the original table's total row says 33 – 43, but its rows add up to 32.5 – 42 (a summing error in the
+pre-start estimate, found while revising; the original table is left as written).
 
 Not in the original estimate: the analysis and planning phase (requirement breakdown, decisions D1–D9, Prisma
 spike, environment setup) carried out 2026-10-02 to 2026-10-05.

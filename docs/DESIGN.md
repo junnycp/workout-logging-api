@@ -317,7 +317,7 @@ Perf: `npm run seed:perf` + `npm run perf:explain` (script, not part of the test
 | — | Video (recorded by you; I prepare a script outline) | 2–3 | — |
 
 Milestone hours are a working breakdown and differ slightly by rounding. The authoritative estimate,
-including its post-design revision (34.5–45 h, target ≈ 39.5 h), is `docs/ESTIMATION.md`.
+including its post-design revision (34–44 h, target ≈ 39 h), is `docs/ESTIMATION.md`.
 
 Within each milestone: write tests first for domain logic → implement → `lint + typecheck + test` →
 independent review (`/code-review` or `technical-leader`) → you review → commit(s). Corrections found in review

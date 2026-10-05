@@ -73,6 +73,14 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   commit approval is not push approval and pushes need an explicit request. Also stored in the agent's memory.
 - **Commit:** pushed range `a68da97..044d005`; rule added in the commit that follows this entry.
 
+### C6 — Arithmetic errors in the time estimate (2026-10-05, estimation)
+- **AI output:** The pre-start estimate's total row said 33–43 h while its rows sum to 32.5–42 h. The post-design
+  revision then listed "all other items" as 22.5–29 h (correct: 18.5–24 h) and a total of 34.5–45 h.
+- **How detected:** Before pushing, the AI recomputed every row with a script instead of trusting its own sums.
+- **Outcome:** Revision corrected to 34–44 h (target ≈ 39 h); the original table is kept as written, with a note
+  about its summing error. Lesson: compute totals with code, not by hand.
+- **Commit:** correction committed separately after `53aa1eb`.
+
 ## 4. Rejected AI suggestions
 
 | Date | Decision | AI suggested | I decided | Reason |
