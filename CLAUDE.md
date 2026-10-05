@@ -36,6 +36,7 @@ npm test                         # unit tests (Jest via node --experimental-vm-m
 npm run test:e2e                 # integration tests, Testcontainers Postgres (Colima socket auto-detected)
 npm run prisma:generate          # regenerate src/generated/prisma after schema changes
 npx prisma migrate dev --name <change>   # new migration; never edit an applied migration
+npm run seed                     # build, then sync prisma/seed/exercise-catalog.json (idempotent; needs DATABASE_URL)
 ```
 
 Keep this section in sync with `package.json` when scripts change.

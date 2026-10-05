@@ -13,11 +13,10 @@ FROM deps AS build
 COPY . .
 RUN npx prisma generate && npm run build
 
-# One-shot job run by docker compose before the API starts.
-FROM deps AS migrate
-COPY prisma ./prisma
-COPY prisma.config.ts ./
-CMD ["npx", "prisma", "migrate", "deploy"]
+# One-shot job run by docker compose before the API starts: apply migrations, then sync the
+# exercise catalog (idempotent). Built on the build stage for the Prisma CLI, dist/ and the catalog.
+FROM build AS migrate
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/cli/seed-catalog.js"]
 
 FROM base AS runtime
 ENV NODE_ENV=production

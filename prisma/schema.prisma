@@ -1,10 +1,12 @@
 // Data model: see docs/DESIGN.md section 3. Table and column names are snake_case in Postgres.
 
 generator client {
-  provider        = "prisma-client"
-  output          = "../src/generated/prisma"
-  moduleFormat    = "cjs"
-  previewFeatures = ["postgresqlExtensions"]
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "cjs"
+  // Extensionless relative imports: resolvable by tsc (CommonJS), Nest build and Jest globalSetup alike.
+  importFileExtension = ""
+  previewFeatures     = ["postgresqlExtensions"]
 }
 
 datasource db {

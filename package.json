@@ -19,7 +19,8 @@
     "test:e2e": "node --experimental-vm-modules --disable-warning=ExperimentalWarning node_modules/jest/bin/jest.js --config ./test/jest-e2e.config.js --passWithNoTests",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "seed": "npm run -s build && node dist/cli/seed-catalog.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.2",
