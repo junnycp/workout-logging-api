@@ -245,7 +245,11 @@ Codes are defined in `src/common/errors/error-codes.ts`; detail codes come from 
   validator, the Swagger enum, conversion in and out (decimal.js). Adding stone = one line
   `{ code: 'st', label: 'stone', toKgFactor: '6.35029318' }`; a unit test builds a registry with stone to prove
   conversions need no other change.
-- **Rounding**: stored exact (`numeric`), rounded only at the response boundary to 2 decimals.
+- **Rounding**: `weight` is stored as entered; `weight_kg`, `volume_kg`, `e1rm_kg` are stored at 4 decimals and
+  used to filter, sort and pick PRs. Values returned by the API are recomputed from the original `reps`, `weight`
+  and `unit` with the same domain functions (`weightUnits`, `volumeKg`, `epleyOneRepMaxKg`) and rounded once, to
+  2 decimals. Rounding the stored 4-decimal value again would round twice: 32 lb = 14.51495584 kg is stored as
+  14.5150 and would be answered as 14.52 instead of 14.51.
 - **Volume** = `reps × weight_kg`.
 - **Epley** = `weight_kg × (1 + reps / 30)`, applied literally for all reps as the brief specifies (D3a). At reps = 1
   this gives 1.033 × weight although the usual convention assumes r > 1; documented in README with an example

@@ -68,6 +68,9 @@ docs/adr/        # short architecture decision records
   one registry entry and nothing else. The DB `unit` column is plain varchar (no ENUM/CHECK); the registry is the
   single source of truth, enforced at the API boundary.
 - Store original `weight` + `unit` AND normalized `weight_kg` (NUMERIC, not float). Round only at the API boundary.
+- Response values are recomputed from the original `reps`/`weight`/`unit` with the domain functions, then rounded
+  once. Never round the stored 4-decimal `weight_kg`/`volume_kg`/`e1rm_kg` again (double rounding: 32 lb -> 14.52
+  instead of 14.51). Stored kg columns are for filtering, sorting and PR selection.
 - Epley: `e1rm = weight_kg * (1 + reps / 30)` applied literally for ALL reps, including reps = 1 (decided; the
   brief's formula wins over the r > 1 convention — documented in README). Do not special-case reps = 1.
 - Volume per set = `reps * weight_kg`. Derived values (`weight_kg`, `volume_kg`, `e1rm_kg`) are computed once at
