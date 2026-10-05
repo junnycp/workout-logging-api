@@ -115,6 +115,16 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   boundaries.
 - **Commit:** `feat(common): global exception filter and error envelope` on branch `m1`.
 
+### C10 — Error envelope did not cover routes outside the API prefix (2026-10-05, M1 health)
+- **AI output:** Commit `3816cb5` claimed every error used the envelope, but `GET /foo` still returned Express' HTML
+  404 page. While adding `/health`, the AI also wrote a comment saying the raw DB error "stays in the logs" when
+  nothing logged it.
+- **How detected:** Live curl checks of paths outside `/api/v1`; reading `@nestjs/core` showed the 404 handler is
+  only registered under the global prefix. Re-reading its own diff caught the false comment.
+- **Outcome:** A not-found fallback registered after `app.init()` renders the envelope for any unmatched route, a
+  shared `errorBody()` keeps one shape, and the health controller now really logs failing dependencies.
+- **Commit:** `fix(common): ...` and `feat(health): ...` on branch `m1`.
+
 ## 4. Rejected AI suggestions
 
 | Date | Decision | AI suggested | I decided | Reason |
