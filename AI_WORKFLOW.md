@@ -212,6 +212,32 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   filter, sort and select PRs. Rule added to DESIGN §5 and CLAUDE.md; an e2e test pins 32 lb → 14.51.
 - **Commit:** `28e7f17`.
 
+### C17 — Stored instants shifted by the database session time zone (2026-10-05, M5 review)
+- **AI output:** The M1 `PrismaService` created the pg adapter with only a connection string. M4 (writes) and the
+  M5 history query (range bounds, cursor) passed JS `Date`s through it. All 153 unit and 85 e2e tests passed,
+  and real query plans on 50k entries looked right.
+- **How detected:** The independent `technical-leader` review of M5 read the `@prisma/adapter-pg` source:
+  `formatDateTime` sends Dates as `"YYYY-MM-DD HH:MM:SS"` with no offset, which Postgres reads in the session
+  time zone. The tests passed only because the Postgres image defaults to UTC. Reproduced before fixing: on a
+  server started with `timezone=Asia/Ho_Chi_Minh`, POST `10:00Z` was stored as `03:00Z`, while the API still
+  returned `10:00Z` because reads shifted back the same way. So the bug was invisible through the API. The
+  review also said it affected only M5 queries; the repro showed it had been in the write path since M4.
+- **Outcome:** One adapter factory (`createPgAdapter`) pins `TimeZone=UTC` for the app, the seed CLI and the test
+  helpers. Test first: an e2e test on a database whose default zone is Asia/Ho_Chi_Minh checks the stored
+  instant in SQL and a GET by exact instant. DESIGN §6 records the rule.
+- **Commit:** `7a800e9` (test), `e62f55e` (fix).
+
+### C18 — Smaller M5 review findings (2026-10-05, M5 review)
+- **AI output:** M5 history (`10ecfff`).
+- **How detected:** Same review. (1) `muscleGroup=Chest` returned 400 although exercise names are matched
+  case-insensitively. (2) Grouping sets copied the array for each set (quadratic). (3) A type cast would have
+  returned `exercise: undefined` if the FK invariant ever broke. (4) DESIGN §4.2 still described the pre-M5
+  contract. One finding was a false positive: "LIKE escaping is only unit-tested". The e2e spec already
+  checks that `%` and `_` return an empty page.
+- **Outcome:** (1) Test first, then trim + lower-case the code. (2) Push into the existing list. (3) Throw an
+  explicit error. (4) Rewrote DESIGN §4.2, including the cost bound of the LATERAL query as a trade-off.
+- **Commit:** `13db533` (test), `c2df428` (fix), `3ea2379` (docs).
+
 ## 4. Rejected AI suggestions
 
 | Date | Decision | AI suggested | I decided | Reason |
