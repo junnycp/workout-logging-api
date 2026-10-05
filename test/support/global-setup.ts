@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql';
-import { PrismaPg } from '@prisma/adapter-pg';
+import { createPgAdapter } from '../../src/database/pg-adapter';
 import { syncExerciseCatalog } from '../../src/exercises/catalog/catalog-sync';
 import { loadExerciseCatalog } from '../../src/exercises/catalog/load-catalog';
 import { PrismaClient } from '../../src/generated/prisma/client';
@@ -23,7 +23,7 @@ export default async function globalSetup(): Promise<void> {
   execFileSync('npx', ['prisma', 'migrate', 'deploy'], { env: process.env, stdio: 'pipe' });
 
   const prisma = new PrismaClient({
-    adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+    adapter: createPgAdapter(process.env.DATABASE_URL),
   });
   try {
     await syncExerciseCatalog(prisma, loadExerciseCatalog());

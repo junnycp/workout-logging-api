@@ -1,10 +1,10 @@
 import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { PrismaPg } from '@prisma/adapter-pg';
+import { createPgAdapter } from '../../src/database/pg-adapter';
 import { PrismaClient } from '../../src/generated/prisma/client';
 
 const clientFor = (url: string): PrismaClient =>
-  new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
+  new PrismaClient({ adapter: createPgAdapter(url) });
 
 export interface IsolatedDatabase {
   url: string;
