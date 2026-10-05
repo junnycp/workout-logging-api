@@ -94,7 +94,13 @@ describe('Platform behaviour (e2e)', () => {
   describe('OpenAPI', () => {
     it('serves the document with the shared error envelope schema', async () => {
       const res = await request(app.getHttpServer()).get('/docs-json').expect(200);
-      const document = res.body as { components: { schemas: Record<string, unknown> } };
+      const document = res.body as {
+        paths: Record<string, Record<string, unknown>>;
+        components: { schemas: Record<string, unknown> };
+      };
+      expect(Object.keys(document.paths['/api/v1/users/{userId}/workouts'] ?? {})).toContain(
+        'post',
+      );
       expect(Object.keys(document.components.schemas)).toEqual(
         expect.arrayContaining(['ErrorResponseDto', 'ErrorDto', 'ErrorDetailDto']),
       );

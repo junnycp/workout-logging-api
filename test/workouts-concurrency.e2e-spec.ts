@@ -1,6 +1,7 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
 import type { PrismaClient } from '../src/generated/prisma/client';
+import { canonicalJson } from '../src/common/idempotency/request-hash';
 import { createTestApp } from './support/create-app';
 import { createTestPrisma, uniqueUserId } from './support/db';
 
@@ -15,9 +16,13 @@ const entry = (reps: number) => ({
 describe('Concurrent POST /workouts (e2e)', () => {
   let app: NestExpressApplication;
   let prisma: PrismaClient;
+  let baseUrl: string;
 
   beforeAll(async () => {
     app = await createTestApp();
+    // A real port: supertest would otherwise attach listeners to one server per parallel request.
+    await app.listen(0);
+    baseUrl = await app.getUrl();
     prisma = createTestPrisma();
   });
 
@@ -29,7 +34,7 @@ describe('Concurrent POST /workouts (e2e)', () => {
   const fire = (userId: string, bodies: unknown[], key?: string) =>
     Promise.all(
       bodies.map((body) => {
-        const req = request(app.getHttpServer()).post(`/api/v1/users/${userId}/workouts`);
+        const req = request(baseUrl).post(`/api/v1/users/${userId}/workouts`);
         if (key) req.set('Idempotency-Key', key);
         return req.send(body as object);
       }),
@@ -53,8 +58,9 @@ describe('Concurrent POST /workouts (e2e)', () => {
       'double-tap',
     );
     const statuses = responses.map((r) => r.status).sort();
-    expect(statuses).toEqual([...Array(PARALLEL - 1).fill(200), 201]);
-    const bodies = new Set(responses.map((r) => JSON.stringify(r.body)));
+    expect(statuses).toEqual([...(Array(PARALLEL - 1).fill(200) as number[]), 201]);
+    // Same content; key order may differ because the stored copy comes back from JSONB.
+    const bodies = new Set(responses.map((r) => canonicalJson(r.body)));
     expect(bodies.size).toBe(1);
     expect(await prisma.workoutEntry.count({ where: { userId } })).toBe(1);
   });
