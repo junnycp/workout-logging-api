@@ -247,6 +247,13 @@ describe('GET /api/v1/users/:userId/workouts (e2e)', () => {
       ]);
     });
 
+    it('reads the muscle-group code case-insensitively, like exercise names', async () => {
+      expect(await names({ muscleGroup: ' Hamstrings ' })).toEqual([
+        'Back Squat',
+        'Romanian Deadlift',
+      ]);
+    });
+
     it('combines the name and muscle-group filters', async () => {
       expect(await names({ exercise: 'squat', muscleGroup: 'quads' })).toEqual(['Back Squat']);
       expect(await names({ exercise: 'bench', muscleGroup: 'quads' })).toEqual([]);
