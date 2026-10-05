@@ -89,6 +89,8 @@ describe('Exercise catalog sync (integration)', () => {
     // Exercises dropped from the catalog are kept (entries may reference them) and reported.
     expect(report.staleExercises).toContain('Deadlift');
     expect(await db.prisma.exercise.findUnique({ where: { name: 'Deadlift' } })).not.toBeNull();
+    // ...but they can no longer be resolved by name, so new logs cannot reference them (D5).
+    expect(await exerciseIdFor('deadlift')).toBeUndefined();
   });
 
   it('serves partial name matches from the trigram index', async () => {

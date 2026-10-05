@@ -57,6 +57,24 @@ describe('parseExerciseCatalog', () => {
     ]);
   });
 
+  it('rejects two exercises with the same name, including after trimming', () => {
+    const problems = problemsOf({
+      ...base,
+      exercises: [
+        { name: 'Squat', primaryMuscles: ['chest'] },
+        { name: 'Squat ', primaryMuscles: ['chest'] },
+      ],
+    });
+    expect(problems).toEqual(['Exercise "Squat" is defined more than once']);
+  });
+
+  it('rejects names whose normalized key exceeds 100 characters', () => {
+    // NFKC expands the ligature U+FB03 to "ffi": 98 + 1 characters become a 101-character key.
+    const name = `${'a'.repeat(98)}\uFB03`;
+    const problems = problemsOf({ ...base, exercises: [{ name, primaryMuscles: ['chest'] }] });
+    expect(problems).toEqual([`"${name}" normalizes to a key longer than 100 characters`]);
+  });
+
   it('rejects unknown muscle group codes', () => {
     const problems = problemsOf({
       ...base,

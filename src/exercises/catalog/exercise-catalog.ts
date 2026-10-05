@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { normalizeExerciseName } from '../exercise-name';
 
+/** Column size of exercise_names.name_key; checked after NFKC, which can lengthen a name. */
+const MAX_NAME_KEY_LENGTH = 100;
+
 const code = z.string().regex(/^[a-z][a-z_]{1,31}$/, 'must be a lower_snake_case code');
 const displayName = z.string().trim().min(1).max(100);
 
@@ -58,15 +61,28 @@ export function parseExerciseCatalog(raw: unknown): ExerciseCatalog {
     knownCodes.add(group.code);
   }
 
-  const ownerByKey = new Map<string, string>();
-  const exercises = parsed.data.exercises.map((exercise): CatalogExercise => {
+  // Owners are tracked by position, not by display name, so two entries with the same name collide too.
+  const ownerByKey = new Map<string, number>();
+  const seenNames = new Set<string>();
+  const exercises = parsed.data.exercises.map((exercise, index): CatalogExercise => {
+    if (seenNames.has(exercise.name)) {
+      problems.push(`Exercise "${exercise.name}" is defined more than once`);
+    }
+    seenNames.add(exercise.name);
     const nameKeys = [...new Set([exercise.name, ...exercise.aliases].map(normalizeExerciseName))];
     for (const key of nameKeys) {
+      if (key.length > MAX_NAME_KEY_LENGTH) {
+        problems.push(
+          `"${exercise.name}" normalizes to a key longer than ${MAX_NAME_KEY_LENGTH} characters`,
+        );
+        continue;
+      }
       const owner = ownerByKey.get(key);
-      if (owner !== undefined && owner !== exercise.name) {
-        problems.push(`"${exercise.name}" uses the name "${key}", already used by "${owner}"`);
-      } else {
-        ownerByKey.set(key, exercise.name);
+      if (owner === undefined) {
+        ownerByKey.set(key, index);
+      } else if (parsed.data.exercises[owner]?.name !== exercise.name) {
+        const ownerName = parsed.data.exercises[owner]?.name ?? '';
+        problems.push(`"${exercise.name}" uses the name "${key}", already used by "${ownerName}"`);
       }
     }
     for (const muscle of [...exercise.primaryMuscles, ...exercise.secondaryMuscles]) {

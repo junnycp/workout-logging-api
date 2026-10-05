@@ -12,8 +12,8 @@ export interface CatalogSyncReport {
 
 /**
  * Makes the database match the catalog. Idempotent: running it twice changes nothing and keeps
- * exercise ids stable. Exercises are matched by canonical name; renaming one in the catalog creates a
- * new exercise and reports the old one as stale. Runs in one transaction under an advisory lock so two
+ * exercise ids stable. Exercises are matched by canonical name, so renaming one in the catalog creates a
+ * new exercise and retires the old one (its history is not moved): add an alias instead of renaming. Runs in one transaction under an advisory lock so two
  * deploys syncing at the same time cannot interleave.
  */
 export async function syncExerciseCatalog(
@@ -79,11 +79,14 @@ export async function syncExerciseCatalog(
       await tx.exerciseMuscleGroup.deleteMany({ where: { exerciseId: { in: exerciseIds } } });
       await tx.exerciseMuscleGroup.createMany({ data: mappings });
 
+      // Exercises dropped from the catalog keep their row (entries may reference them) but lose their
+      // names, so they can no longer be resolved for new logs: the catalog stays a closed list (D5).
       const stale = await tx.exercise.findMany({
         where: { id: { notIn: exerciseIds } },
-        select: { name: true },
+        select: { id: true, name: true },
         orderBy: { name: 'asc' },
       });
+      await tx.exerciseName.deleteMany({ where: { exerciseId: { in: stale.map((e) => e.id) } } });
 
       return {
         muscleGroups: catalog.muscleGroups.length,
