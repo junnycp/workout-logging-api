@@ -102,6 +102,19 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   ADR 0001. Lesson: when docs and behaviour disagree, read the source and prove it with a minimal test.
 - **Commit:** `chore: scaffold NestJS 12 app ...` on branch `m1`.
 
+### C9 — Unit test encoded a wrong assumption about Nest's error pipeline (2026-10-05, M1 error envelope)
+- **AI output:** The first exception filter handled raw body-parser errors (`type: 'entity.parse.failed'`), and its
+  unit test fed such an error directly to the filter, so the test passed.
+- **How detected:** Calling the running app with curl returned `BAD_REQUEST` instead of `MALFORMED_JSON`, and
+  `requestId: null`. Reading `@nestjs/platform-express` showed `mapException()` converts every `SyntaxError` into a
+  plain `BadRequestException(message)` before filters run, dropping `type`. The null id came from the body parser
+  running before the pino middleware.
+- **Outcome:** A dedicated Express error middleware right after the JSON parser maps parser errors to
+  `AppException` (unit-tested), and a request-id middleware runs before the parser. Verified again with curl.
+  Lesson: unit tests with hand-made inputs only prove what you assumed; a live or e2e check is needed at framework
+  boundaries.
+- **Commit:** `feat(common): global exception filter and error envelope` on branch `m1`.
+
 ## 4. Rejected AI suggestions
 
 | Date | Decision | AI suggested | I decided | Reason |
