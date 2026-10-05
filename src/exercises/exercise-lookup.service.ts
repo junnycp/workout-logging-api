@@ -1,9 +1,18 @@
 import { Injectable } from '@nestjs/common';
+import { escapeLikePattern } from '../common/text/like-pattern';
 import { PrismaService } from '../database/prisma.service';
+import { normalizeExerciseName } from './exercise-name';
 
 export interface ExerciseRef {
   id: string;
   name: string;
+}
+
+export type MuscleRole = 'primary' | 'secondary';
+
+export interface ExerciseDetails extends ExerciseRef {
+  /** Primary groups first, then secondary; alphabetical within a role. */
+  muscleGroups: { code: string; role: MuscleRole }[];
 }
 
 const MAX_SUGGESTIONS = 3;
@@ -44,5 +53,63 @@ export class ExerciseLookupService {
     const suggestions = new Map<string, string[]>(keys.map((key) => [key, []]));
     for (const row of rows) suggestions.get(row.key)?.push(row.name);
     return suggestions;
+  }
+
+  /**
+   * Ids of the exercises whose canonical name or alias contains `term` (normalized like names, matched
+   * literally). Partial matching for history filters; the trigram index serves it once the catalog grows.
+   */
+  async matchIdsByName(term: string): Promise<string[]> {
+    const rows = await this.prisma.exerciseName.findMany({
+      where: { nameKey: { contains: escapeLikePattern(normalizeExerciseName(term)) } },
+      select: { exerciseId: true },
+      distinct: ['exerciseId'],
+    });
+    return rows.map((row) => row.exerciseId);
+  }
+
+  /** Ids of the exercises mapped to a muscle group (any role), or null when the group does not exist. */
+  async exerciseIdsForMuscleGroup(code: string): Promise<string[] | null> {
+    const group = await this.prisma.muscleGroup.findUnique({
+      where: { code },
+      select: { exercises: { select: { exerciseId: true } } },
+    });
+    return group && group.exercises.map((mapping) => mapping.exerciseId);
+  }
+
+  async muscleGroupCodes(): Promise<string[]> {
+    const rows = await this.prisma.muscleGroup.findMany({
+      select: { code: true },
+      orderBy: { code: 'asc' },
+    });
+    return rows.map((row) => row.code);
+  }
+
+  /** Names and muscle groups for the exercises on one page of results; one query. */
+  async describe(ids: string[]): Promise<Map<string, ExerciseDetails>> {
+    const rows = await this.prisma.exercise.findMany({
+      where: { id: { in: [...new Set(ids)] } },
+      select: {
+        id: true,
+        name: true,
+        muscleGroups: {
+          select: { muscleGroupCode: true, role: true },
+          orderBy: [{ role: 'asc' }, { muscleGroupCode: 'asc' }],
+        },
+      },
+    });
+    return new Map(
+      rows.map((row) => [
+        row.id,
+        {
+          id: row.id,
+          name: row.name,
+          muscleGroups: row.muscleGroups.map((group) => ({
+            code: group.muscleGroupCode,
+            role: group.role,
+          })),
+        },
+      ]),
+    );
   }
 }
