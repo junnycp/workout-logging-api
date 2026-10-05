@@ -81,6 +81,17 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   about its summing error. Lesson: compute totals with code, not by hand.
 - **Commit:** correction committed separately after `53aa1eb`.
 
+### C7 — Outdated stack versions written from memory (2026-10-05, M1 planning)
+- **AI output:** The `CLAUDE.md` written on 2026-10-02 specified "Node.js 20 LTS" and "NestJS 11" without checking
+  current releases.
+- **How detected:** Planning M1, the AI checked npm and nodejs.org: Node 20 has been end-of-life since spring 2026,
+  NestJS 12 was released on 2026-08-27, and TypeScript 7 (npm `latest`) is outside the peer ranges of Swagger and
+  typescript-eslint.
+- **Outcome:** Node 24.21.0, NestJS 12 (CommonJS), TypeScript 6.0 pinned; recorded in
+  `docs/adr/0001-runtime-versions.md` and `CLAUDE.md`. Lesson: check versions against the registry before
+  scaffolding, the same way library capabilities were checked in C1.
+- **Commit:** the ADR commit at the start of branch `m1`.
+
 ## 4. Rejected AI suggestions
 
 | Date | Decision | AI suggested | I decided | Reason |

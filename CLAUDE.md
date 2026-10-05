@@ -9,7 +9,9 @@ The git log and `AI_WORKFLOW.md` are deliverables. Follow "AI adoption rules" be
 
 ## Stack (decided — do not change without an ADR in `docs/adr/`)
 
-- Node.js 20 LTS, TypeScript `strict: true`, NestJS 11
+- Node.js 24 LTS (24.21.0, `.nvmrc`; run `nvm use` first), NestJS 12 as a **CommonJS** app,
+  TypeScript **6.0.x pinned** (TS 7 breaks `@nestjs/swagger` and `typescript-eslint` peers), `strict: true`
+- Lint: ESLint + typescript-eslint type-aware rules; format: Prettier. See `docs/adr/0001-runtime-versions.md`
 - PostgreSQL 16 (relational entries/sets, `pg_trgm` for partial name match, transactional bulk insert)
 - Prisma **7.10.0, pinned exact** (npm `latest` is an 8.0 RC) with `@prisma/adapter-pg` and `prisma.config.ts`;
   exposed through a `PrismaService` provider. Use the Prisma client by default. Only two typed raw queries
