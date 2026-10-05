@@ -10,8 +10,12 @@ The git log and `AI_WORKFLOW.md` are deliverables. Follow "AI adoption rules" be
 ## Stack (decided — do not change without an ADR in `docs/adr/`)
 
 - Node.js 20 LTS, TypeScript `strict: true`, NestJS 11
-- PostgreSQL 16 (relational sets/entries, window functions for PRs, `pg_trgm` for partial name match,
-  transactional bulk insert). ORM: Prisma; use typed raw SQL (`$queryRaw` / TypedSQL) for aggregations
+- PostgreSQL 16 (relational entries/sets, `pg_trgm` for partial name match, transactional bulk insert)
+- Prisma **7.10.0, pinned exact** (npm `latest` is an 8.0 RC) with `@prisma/adapter-pg` and `prisma.config.ts`;
+  exposed through a `PrismaService` provider. Use the Prisma client by default. Only two typed raw queries
+  (`$queryRaw` / TypedSQL, always parameterized): the history keyset page (Prisma's native cursor is O(depth))
+  and `similarity()` name suggestions
+- Index needs Prisma can't express (e.g. `INCLUDE`) are replaced by key columns, never hand-edited migrations
 - Validation: `class-validator` + global `ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })`
 - Config: `@nestjs/config` with schema validation at boot (fail fast on missing env)
 - Logging: `nestjs-pino` (JSON logs, request id, no PII in logs)
@@ -28,7 +32,8 @@ npm run lint && npm run typecheck
 npm test                         # unit tests
 npm run test:e2e                 # integration tests (needs Postgres)
 npx prisma migrate dev --name <change>   # new migration; never edit an applied migration
-npm run seed                     # exercises + muscle-group mapping, optional 50k-entry perf dataset
+npm run seed                     # sync exercise catalog + muscle-group mapping (idempotent)
+npm run seed:perf                # 50k-entry performance dataset
 ```
 
 Keep this section in sync with `package.json` when scripts change.
@@ -56,20 +61,26 @@ docs/adr/        # short architecture decision records
 
 ## Domain rules (non-obvious)
 
-- Units: registry maps unit -> kg factor (`kg: 1`, `lb: 0.45359237`). Adding `stone` must be one registry entry
-  plus nothing else in business logic. Do not use a Postgres ENUM for units (use text + CHECK sourced from registry
-  or a lookup table) so adding a unit needs no type migration pain.
+- Units: registry maps unit -> kg factor as a decimal string (`kg: '1'`, `lb: '0.45359237'`). Adding `stone` must be
+  one registry entry and nothing else. The DB `unit` column is plain varchar (no ENUM/CHECK); the registry is the
+  single source of truth, enforced at the API boundary.
 - Store original `weight` + `unit` AND normalized `weight_kg` (NUMERIC, not float). Round only at the API boundary.
-- Epley: `e1rm = weight_kg * (1 + reps / 30)`. Define and document behaviour for reps = 1 and bodyweight (weight 0).
-- Volume per set = `reps * weight_kg`.
-- Muscle-group mapping is data (seeded table driven by `prisma/seed/exercise-muscle-groups.json`), never a
-  `switch` in services.
-- Exercise names: trim + case-insensitive matching via a normalized column; partial match uses `pg_trgm` index.
+- Epley: `e1rm = weight_kg * (1 + reps / 30)` applied literally for ALL reps, including reps = 1 (decided; the
+  brief's formula wins over the r > 1 convention — documented in README). Do not special-case reps = 1.
+- Volume per set = `reps * weight_kg`. Derived values (`weight_kg`, `volume_kg`, `e1rm_kg`) are computed once at
+  write time by the domain functions, with `decimal.js`/Prisma `Decimal`, never JS floats.
+- Bodyweight sets (weight 0) are valid logs but never PRs; only-bodyweight history -> records `null` + message.
+- PR tie-break: higher value -> more reps -> earliest `performed_at` -> lowest set id.
+- Exercise catalog is a CLOSED list in `prisma/seed/exercise-catalog.json` (name, aliases, muscle groups), synced
+  into tables by `npm run seed`. Unknown names are rejected (`UNKNOWN_EXERCISE` + up to 3 trigram suggestions);
+  never auto-create exercises. Mapping is data, never a `switch` in services. No catalog endpoint.
+- Exercise names: trim + collapse spaces + lower-case into `name_key`; partial match uses the `pg_trgm` index.
 
 ## Time and dates
 
-- Store `performed_at` as `timestamptz` (UTC). Accept ISO-8601 with offset; reject dates without one or default
-  explicitly and document it.
+- Store `performed_at` as `timestamptz` (UTC) plus `utc_offset_minutes`. Input `date` is either an ISO-8601
+  datetime WITH offset (`Z` or `+07:00`), or date-only `YYYY-MM-DD` together with an IANA `timezone`.
+  A datetime without offset is rejected with 400 — never parse it with `new Date()` (it would use server time).
 - Date-range filters and "this month vs last month" accept a `tz` (IANA) query param, default `UTC`.
   Compute boundaries in that tz, compare in UTC. Trade-offs go in README.
 
@@ -82,6 +93,7 @@ docs/adr/        # short architecture decision records
 - Lists use cursor pagination (`limit`, `cursor` = opaque base64 of `(performed_at, id)`); `limit` capped at 100.
 - Bulk create is all-or-nothing in one transaction; support `Idempotency-Key` header for safe retries.
 - Every query path must be backed by an index; check new queries with `EXPLAIN ANALYZE` on the 50k seed.
+- Scope is fixed by the approved plan: Swagger yes; no CI workflow, no catalog/admin endpoints, no auth.
 
 ## Testing rules
 
