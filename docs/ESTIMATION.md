@@ -46,4 +46,4 @@ spike, environment setup) carried out 2026-10-02 to 2026-10-05.
 
 | Phase | Estimate (h) | Actual (h) |
 |-------|--------------|------------|
-| Analysis & planning | — (not estimated) | _to be filled in_ |
+| Analysis & planning | — (not estimated) | ≈ 4 |
