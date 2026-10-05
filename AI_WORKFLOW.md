@@ -137,6 +137,23 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   the e2e boot test planned for M1 is the safety net, and live-check results must be read before committing.
 - **Commit:** `fix(health): ...` after `e820565` on branch `m1`.
 
+### C12 — Gaps found by the independent review of M1 (2026-10-05, M1 review)
+- **AI output:** The M1 branch passed lint, typecheck, 30 unit and 8 e2e tests and a clean-clone
+  `docker compose up`.
+- **How detected:** A fresh `technical-leader` subagent reviewed `main..m1` without the implementation context
+  and reproduced each issue against a running app:
+  1. Body-parser errors other than invalid JSON / too large (e.g. `Content-Encoding: foo`) returned
+     **500 INTERNAL_ERROR** and were logged as unhandled — reproduced again by the main session before fixing.
+  2. Requests rejected before Nest routing (malformed JSON, 413, unknown routes outside `/api/v1`) produced
+     **no access-log line**, although the client received a `requestId` to quote.
+  3. (optional) A 5xx `HttpException` leaked its message and was not logged.
+  4. (optional) Config wiring (`ConfigModule.forRoot` + schema) was untested.
+- **Outcome:** All four fixed with tests first: every 4xx body-parser error keeps its status, 5xx messages are
+  hidden and logged, one pino-http instance is mounted before the body parser and shared with nestjs-pino
+  (`useExisting`), and a wiring test (which revealed that `forRoot()` is async in Nest 12). Not changed: the
+  reviewer's suggestion to add codes for 409/422 — services only throw `AppException` with explicit codes.
+- **Commit:** the `fix(...)` / `test(config)` commits after `92da5eb` on branch `m1`.
+
 ## 4. Rejected AI suggestions
 
 | Date | Decision | AI suggested | I decided | Reason |
