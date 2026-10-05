@@ -2,6 +2,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { mapBodyParserErrors } from './common/errors/body-parser-errors';
 import { notFoundFallback } from './common/errors/not-found.fallback';
 import { requestIdMiddleware } from './common/logging/request-id.middleware';
+import { setupSwagger } from './common/openapi/swagger';
 
 export const API_PREFIX = 'api/v1';
 export const MAX_JSON_BODY = '1mb';
@@ -17,6 +18,7 @@ export async function setupApp(app: NestExpressApplication): Promise<NestExpress
   app.use(mapBodyParserErrors);
   app.setGlobalPrefix(API_PREFIX, { exclude: ['health'] });
   app.enableShutdownHooks();
+  setupSwagger(app);
   await app.init();
   // Must come after init(): Nest's own routes and prefixed 404 handler are registered there.
   app.use(notFoundFallback);

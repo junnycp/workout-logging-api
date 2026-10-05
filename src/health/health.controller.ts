@@ -1,10 +1,13 @@
 import { Controller, Get, HttpStatus, ServiceUnavailableException } from '@nestjs/common';
 import { HealthCheck, HealthCheckResult, HealthCheckService } from '@nestjs/terminus';
+import { ApiOkResponse, ApiServiceUnavailableResponse, ApiTags } from '@nestjs/swagger';
 import { PinoLogger } from 'nestjs-pino';
+import { ErrorResponseDto } from '../common/openapi/error-response.dto';
 import { AppException } from '../common/errors/app-exception';
 import { ErrorCode } from '../common/errors/error-codes';
 import { DatabaseHealthIndicator } from './database.health';
 
+@ApiTags('health')
 @Controller('health')
 export class HealthController {
   constructor(
@@ -18,6 +21,8 @@ export class HealthController {
   /** Liveness + readiness: 200 when every dependency answers, 503 with the failing ones otherwise. */
   @Get()
   @HealthCheck()
+  @ApiOkResponse({ description: 'All dependencies are reachable' })
+  @ApiServiceUnavailableResponse({ description: 'A dependency is down', type: ErrorResponseDto })
   async check(): Promise<HealthCheckResult> {
     try {
       return await this.health.check([() => this.database.isHealthy('database')]);
