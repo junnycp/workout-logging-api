@@ -42,7 +42,7 @@ Every requirement gets an ID; tests and README sections reference these IDs.
 
 | Area | Choice | Why | Rejected alternative |
 |------|--------|-----|----------------------|
-| Framework | NestJS 11, TypeScript strict | Recommended by brief; DI is an explicit evaluation criterion | Fastify alone (no DI conventions) |
+| Framework | NestJS 12, TypeScript strict (versions: `docs/adr/0001-runtime-versions.md`) | Recommended by brief; DI is an explicit evaluation criterion | Fastify alone (no DI conventions) |
 | Database | PostgreSQL 16 | Entry→sets is relational; PR = aggregation over indexed numeric columns; `pg_trgm` for partial match; ACID bulk insert; unique constraints for idempotency; `NUMERIC` for exact weights | MongoDB: sets embedded in documents make per-set PR indexing awkward (multikey index + `$unwind`), no exact decimal arithmetic in aggregations without Decimal128 friction |
 | Data access | **Prisma 7.10.0** (pinned; npm `latest` points to an 8.0 RC) + `@prisma/adapter-pg`, `PrismaService` provider (D1) | Team familiarity; type-safe client; reviewable SQL migrations; spike 13a showed trigram GIN, DESC and covering indexes, transactions, `ON CONFLICT DO NOTHING` all work. Two typed raw queries: history keyset page (native cursor is O(depth)) and `similarity()` suggestions | Drizzle via `@nestjs/drizzle` (official Nest package), Kysely, raw `pg` |
 | Decimal math | `decimal.js` in the domain layer, `NUMERIC` in DB, `pg` returns numerics as strings | No float drift on lb↔kg (0.45359237) | JS `number` everywhere |
@@ -302,12 +302,19 @@ HTTP ─► Controller (DTO validation, mapping) ─► Service (rules, transact
 ```
 Modules: `common` (errors, filter, pagination, request-id), `config`, `database` (PrismaService, transactions),
 `units`, `exercises` (catalog + mapping sync), `workouts`, `records`, `health`.
-DI tokens for things that vary: `WEIGHT_UNIT_REGISTRY`, `CLOCK`, `EXERCISE_CATALOG_SOURCE`.
+Services, repositories and `PrismaService` are Nest providers. Not everything that varies is a DI token:
+- Weight units: a module-level registry (`weightUnits`, built by `createWeightUnitRegistry(WEIGHT_UNITS)`), imported
+  directly. The class-validator decorator `@IsWeightUnit()` and the Swagger enum are evaluated outside Nest's
+  container, so a DI token would still need this static instance; one shared instance keeps a single source.
+  Tests build other registries with `createWeightUnitRegistry`; `computeSetMetrics` takes one as a parameter.
+- Exercise catalog: data in `prisma/seed/exercise-catalog.json`, loaded and validated by the seed CLI and synced to
+  tables; services read the tables, not the file.
+- Clock: `CLOCK` token (`src/common/time/clock.ts`) for "now" in period comparisons (M6).
 
 ## 10. Testing strategy
 
-Unit (pure, fast, TDD): unit conversion (round trips, precision, unsupported unit, injected extra unit),
-volume & Epley (brief examples, reps = 1, weight 0), PR tie-break comparator, period boundaries (month
+Unit (pure, fast, TDD): unit conversion (round trips, precision, unsupported unit, a registry built with stone),
+volume & Epley (brief examples, reps = 1, weight 0), period boundaries (month
 ends, leap Feb, DST in America/New_York, Asia/Ho_Chi_Minh), name normalization, cursor codec.
 
 Integration (Testcontainers Postgres, real migrations, Supertest):

@@ -209,6 +209,7 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
 | 2026-10-02 | D9 Catalog endpoint | `GET /exercises?search=` so clients can discover valid names | Rejected | Keep scope controlled; avoid over-engineering |
 | 2026-10-05 | D3 Epley at reps = 1 | Special-case reps = 1 → e1RM = weight (convention r > 1) | Apply the brief's formula literally for all reps | Respect the brief: the formula is explicitly specified |
 | 2026-10-05 | D1 Data access | Drizzle via `@nestjs/drizzle` | Prisma (verified by spike, C1) | Prior experience with Prisma; spike showed it covers the brief |
+| 2026-10-05 | Pre-M5 check, finding F2 | Expose the weight-unit registry as a Nest provider (`WEIGHT_UNIT_REGISTRY`) because DESIGN listed that token and DI is graded | Keep the static registry; correct DESIGN instead | X1 is already met by one registry entry; the DTO validator cannot use DI anyway, so a token would add a second access path to the same object |
 
 ## 5. AI-generated code explained line by line
 
