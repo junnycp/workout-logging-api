@@ -219,24 +219,32 @@ Either `period=month|week|year` (current period-to-date vs the full previous per
 ```
 | HTTP | code | When |
 |------|------|------|
-| 400 | `VALIDATION_ERROR` | Any DTO/query validation failure (detail codes: `UNSUPPORTED_UNIT`, `REQUIRED`, `MUST_BE_POSITIVE`, `INVALID_DATE`, `INVALID_TIMEZONE`, ...) |
-| 400 | `INVALID_DATE_RANGE` | `from` > `to` |
-| 400 | `INVALID_CURSOR` | Cursor not decodable |
-| 400 | `UNKNOWN_EXERCISE` | (detail code) exercise not in catalog, with suggestions |
-| 400 | `UNKNOWN_MUSCLE_GROUP` | `muscleGroup` not in catalog (lists valid codes) |
-| 404 | `ROUTE_NOT_FOUND` | Unknown route |
-| 409 | `IDEMPOTENCY_KEY_REUSED` | Same key, different body |
+| 400 | `VALIDATION_ERROR` | Any path/header/body/query validation failure. One detail per problem: `{ path, code, message }`, e.g. `IS_DEFINED`, `IS_INT`, `IS_NUMBER`, `MIN`, `MAX`, `MAX_DECIMAL_PLACES`, `ARRAY_MIN_SIZE`, `ARRAY_MAX_SIZE`, `IS_ARRAY`, `BLANK`, `MATCHES`, `UNKNOWN_FIELD`, `UNSUPPORTED_UNIT`, `INVALID_DATE`, `MISSING_OFFSET`, `MISSING_TIMEZONE`, `INVALID_TIMEZONE`, `UNKNOWN_EXERCISE` (+ `suggestions`) |
+| 400 | `MALFORMED_JSON` | Body is not valid JSON |
+| 400 | `BAD_REQUEST` | Other client errors raised by the HTTP layer (e.g. aborted request) |
+| 400 | `INVALID_DATE_RANGE` | `from` > `to` (M5/M6) |
+| 400 | `INVALID_CURSOR` | Cursor not decodable (M5) |
+| 400 | `UNKNOWN_MUSCLE_GROUP` | `muscleGroup` not in catalog, lists valid codes (M5) |
+| 404 | `ROUTE_NOT_FOUND` | Unknown route, inside or outside `/api/v1` |
+| 405 | `METHOD_NOT_ALLOWED` | Reserved for the HTTP layer |
+| 409 | `IDEMPOTENCY_KEY_REUSED` | Same Idempotency-Key, different body |
 | 413 | `PAYLOAD_TOO_LARGE` | Body > 1 MB |
-| 500 | `INTERNAL_ERROR` | Unexpected; message is generic, details only in logs |
+| 415 | `UNSUPPORTED_MEDIA_TYPE` | Unsupported content encoding or charset |
+| 503 | `SERVICE_UNAVAILABLE` | `/health` when a dependency is down (details per dependency) |
+| 500 | `INTERNAL_ERROR` | Unexpected; message is generic, details only in logs (any non-`AppException` 5xx) |
+
+Codes are defined in `src/common/errors/error-codes.ts`; detail codes come from the validator constraint
+(`isInt` → `IS_INT`) unless the validator sets its own (`UNSUPPORTED_UNIT`, `BLANK`).
 
 ---
 
 ## 5. Domain rules & calculations
 
-- **Unit registry** (`src/units/weight-unit.registry.ts`): `{ code, label, toKgFactor: '<decimal string>' }`.
-  `kg = 1`, `lb = 0.45359237` (exact international pound). Everything derives from it: DTO validator, Swagger
-  enum, conversion in and out. Adding stone = one line `{ code: 'st', toKgFactor: '6.35029318' }`; a test
-  injects an extra unit through DI to prove no other change is needed.
+- **Unit registry** (`src/units/weight-units.ts`, `WEIGHT_UNITS`): `{ code, label, toKgFactor: '<decimal string>' }`.
+  `kg = 1`, `lb = 0.45359237` (exact international pound). Everything derives from it: the `@IsWeightUnit()` DTO
+  validator, the Swagger enum, conversion in and out (decimal.js). Adding stone = one line
+  `{ code: 'st', label: 'stone', toKgFactor: '6.35029318' }`; a unit test builds a registry with stone to prove
+  conversions need no other change.
 - **Rounding**: stored exact (`numeric`), rounded only at the response boundary to 2 decimals.
 - **Volume** = `reps × weight_kg`.
 - **Epley** = `weight_kg × (1 + reps / 30)`, applied literally for all reps as the brief specifies (D3a). At reps = 1
