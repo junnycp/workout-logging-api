@@ -60,11 +60,15 @@ Every requirement gets an ID; tests and README sections reference these IDs.
 
 ```
 exercises
-  id            uuid PK
-  name          text  NOT NULL            -- display name, first spelling seen or catalog name
-  name_key      text  NOT NULL UNIQUE     -- normalized: trim, collapse spaces, lower-case
-  created_at    timestamptz
-  INDEX GIN (name_key gin_trgm_ops)       -- partial match (ILIKE '%bench%')
+  id            uuid PK (UUIDv7)
+  name          varchar(100) NOT NULL UNIQUE   -- canonical display name from the catalog
+  created_at, updated_at timestamptz
+
+exercise_names                            -- every accepted spelling: canonical name + aliases (M2 refinement)
+  name_key      varchar(100) PK           -- normalized: NFKC, trim, collapse spaces, lower-case
+  exercise_id   uuid FK -> exercises
+  is_primary    boolean                   -- true for the canonical name
+  INDEX GIN (name_key gin_trgm_ops)       -- exact lookup, partial match (ILIKE '%bench%'), suggestions
 
 muscle_groups
   code          text PK                   -- 'chest', 'triceps', ...
@@ -109,6 +113,7 @@ idempotency_keys
   user_id       varchar(64)
   key           varchar(128)
   request_hash  char(64)                 -- sha256 of canonical body
+  response_status smallint
   response_body jsonb
   created_at    timestamptz
   PK (user_id, key)
@@ -124,11 +129,12 @@ Design notes (go into README):
 - **Denormalized `user_id/exercise_id/performed_at` on sets**: PR queries become an index-only scan of one
   covering index without joining entries. Entries are immutable in this scope, so no drift risk; if an
   update endpoint is added, both rows are updated in one transaction.
-- **Exercise catalog is a closed list** (D5) defined in `prisma/seed/exercise-catalog.json` (name, optional aliases,
-  muscle groups) and synced idempotently into the tables at deploy/start. Logging an exercise that is not in the
-  catalog is rejected (`UNKNOWN_EXERCISE`, with closest-name suggestions from trigram similarity). Matching is on
-  the normalized key, so "Bench Press", "bench press " and "BENCH  PRESS" resolve to the same exercise.
-  Adding an exercise = edit JSON + re-sync; no code change.
+- **Exercise catalog is a closed list** (D5) defined in `prisma/seed/exercise-catalog.json` (18 muscle groups,
+  57 exercises, 90 aliases, primary/secondary muscles), validated at load and synced idempotently by
+  `npm run seed` / the compose `migrate` job. Aliases live in `exercise_names` (M2 refinement: one table and one
+  trigram index serve lookup, partial match and suggestions). Logging an unknown exercise is rejected
+  (`UNKNOWN_EXERCISE` + suggestions). Adding an exercise = edit JSON + re-sync; no code change. The sync never
+  deletes exercises (entries may reference them) and reports them as stale.
 - **No `users` table**: brief says no auth, userId is a parameter. Validated format `^[A-Za-z0-9_-]{1,64}$`.
 
 ---
