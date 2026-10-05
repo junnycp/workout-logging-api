@@ -79,6 +79,18 @@ describe('Platform behaviour (e2e)', () => {
     });
   });
 
+  describe('other body-parser rejections', () => {
+    it('returns 415 UNSUPPORTED_MEDIA_TYPE (not 500) for an unsupported content encoding', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/anything')
+        .set('content-type', 'application/json')
+        .set('content-encoding', 'foo')
+        .send('{}')
+        .expect(415);
+      expect(errorBodyOf(res).error.code).toBe('UNSUPPORTED_MEDIA_TYPE');
+    });
+  });
+
   describe('OpenAPI', () => {
     it('serves the document with the shared error envelope schema', async () => {
       const res = await request(app.getHttpServer()).get('/docs-json').expect(200);

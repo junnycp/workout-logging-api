@@ -32,6 +32,29 @@ describe('mapBodyParserErrors', () => {
     expect((forwarded as AppException).getStatus()).toBe(413);
   });
 
+  it.each([
+    ['encoding.unsupported', 415, 'UNSUPPORTED_MEDIA_TYPE'],
+    ['charset.unsupported', 415, 'UNSUPPORTED_MEDIA_TYPE'],
+    ['request.aborted', 400, 'BAD_REQUEST'],
+    ['request.size.invalid', 400, 'BAD_REQUEST'],
+  ])('keeps the 4xx status of other body-parser errors (%s)', (type, status, code) => {
+    const forwarded = run(
+      Object.assign(new Error('parser said no'), { type, status, expose: true }),
+    );
+    expect(forwarded).toMatchObject({ code, message: 'parser said no' });
+    expect((forwarded as AppException).getStatus()).toBe(status);
+  });
+
+  it('does not echo a parser message that is not marked as exposable', () => {
+    const forwarded = run(
+      Object.assign(new Error('internal detail'), { type: 'x', status: 400, expose: false }),
+    );
+    expect(forwarded).toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Request could not be processed',
+    });
+  });
+
   it('forwards unrelated errors unchanged', () => {
     const other = new Error('boom');
     expect(run(other)).toBe(other);

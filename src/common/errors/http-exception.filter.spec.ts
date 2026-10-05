@@ -59,10 +59,15 @@ describe('HttpExceptionFilter', () => {
     expect(body).toMatchObject({ error: { code: 'BAD_REQUEST', message: 'bad' } });
   });
 
-  it('maps an unlisted 5xx HttpException to INTERNAL_ERROR', () => {
-    const { status, body } = catchWith(new HttpException('gateway down', HttpStatus.BAD_GATEWAY));
+  it('hides the message of a 5xx HttpException and logs it', () => {
+    const { status, body, logger } = catchWith(
+      new HttpException('gateway down', HttpStatus.BAD_GATEWAY),
+    );
     expect(status).toBe(502);
-    expect(body).toMatchObject({ error: { code: 'INTERNAL_ERROR' } });
+    expect(body).toMatchObject({
+      error: { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred' },
+    });
+    expect(logger.error).toHaveBeenCalled();
   });
 
   it('hides unexpected errors behind a generic 500 and logs them with the request id', () => {

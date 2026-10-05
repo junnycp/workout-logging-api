@@ -1,9 +1,9 @@
-import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common';
+import { ArgumentsHost, Catch, ExceptionFilter, HttpException } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { PinoLogger } from 'nestjs-pino';
 import { AppException } from './app-exception';
 import { errorBody } from './error-body';
-import { ErrorCode, ErrorDetail } from './error-codes';
+import { codeForStatus, ErrorCode, ErrorDetail } from './error-codes';
 
 interface RenderedError {
   status: number;
@@ -11,15 +11,6 @@ interface RenderedError {
   message: string;
   details: ErrorDetail[];
 }
-
-const STATUS_CODES: Partial<Record<number, ErrorCode>> = {
-  [HttpStatus.BAD_REQUEST]: ErrorCode.BAD_REQUEST,
-  [HttpStatus.NOT_FOUND]: ErrorCode.ROUTE_NOT_FOUND,
-  [HttpStatus.METHOD_NOT_ALLOWED]: ErrorCode.METHOD_NOT_ALLOWED,
-  [HttpStatus.PAYLOAD_TOO_LARGE]: ErrorCode.PAYLOAD_TOO_LARGE,
-  [HttpStatus.UNSUPPORTED_MEDIA_TYPE]: ErrorCode.UNSUPPORTED_MEDIA_TYPE,
-  [HttpStatus.SERVICE_UNAVAILABLE]: ErrorCode.SERVICE_UNAVAILABLE,
-};
 
 /**
  * Single place that turns any thrown value into the public error envelope
@@ -39,7 +30,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const requestId = typeof request.id === 'string' ? request.id : null;
     const rendered = this.render(exception);
 
-    if (rendered.status >= 500 && !(exception instanceof HttpException)) {
+    if (rendered.status >= 500 && !(exception instanceof AppException)) {
       this.logger.error({ err: exception, requestId }, 'Unhandled exception');
     }
 
@@ -58,20 +49,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
         details: exception.details,
       };
     }
-    if (exception instanceof HttpException) {
+    if (exception instanceof HttpException && exception.getStatus() < 500) {
       const status = exception.getStatus();
-      return {
-        status,
-        code:
-          STATUS_CODES[status] ??
-          (status >= 500 ? ErrorCode.INTERNAL_ERROR : ErrorCode.BAD_REQUEST),
-        message: exception.message,
-        details: [],
-      };
+      return { status, code: codeForStatus(status), message: exception.message, details: [] };
     }
+    // Any other 5xx keeps its status but never exposes its message.
+    const status = exception instanceof HttpException ? exception.getStatus() : 500;
     return {
-      status: HttpStatus.INTERNAL_SERVER_ERROR,
-      code: ErrorCode.INTERNAL_ERROR,
+      status,
+      code: codeForStatus(status),
       message: 'An unexpected error occurred',
       details: [],
     };
