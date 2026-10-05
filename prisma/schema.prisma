@@ -1,4 +1,4 @@
-// Models are added in M2 (see docs/DESIGN.md, section 3).
+// Data model: see docs/DESIGN.md section 3. Table and column names are snake_case in Postgres.
 
 generator client {
   provider        = "prisma-client"
@@ -10,4 +10,112 @@ generator client {
 datasource db {
   provider   = "postgresql"
   extensions = [pg_trgm]
+}
+
+/// Muscle groups and the exercise mapping are data, synced from prisma/seed/exercise-catalog.json.
+model MuscleGroup {
+  code      String                @id @db.VarChar(32)
+  name      String                @db.VarChar(64)
+  exercises ExerciseMuscleGroup[]
+
+  @@map("muscle_groups")
+}
+
+/// Closed catalog (decision D5): requests may only reference exercises that exist here.
+model Exercise {
+  id           String                @id @default(uuid(7)) @db.Uuid
+  name         String                @unique @db.VarChar(100)
+  createdAt    DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  names        ExerciseName[]
+  muscleGroups ExerciseMuscleGroup[]
+  entries      WorkoutEntry[]
+  sets         WorkoutSet[]
+
+  @@map("exercises")
+}
+
+/// Every accepted spelling of an exercise (canonical name + aliases), normalized. One trigram index
+/// serves exact lookup, partial matching in history filters and "did you mean" suggestions.
+model ExerciseName {
+  nameKey    String   @id @map("name_key") @db.VarChar(100)
+  exerciseId String   @map("exercise_id") @db.Uuid
+  isPrimary  Boolean  @default(false) @map("is_primary")
+  exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@index([exerciseId])
+  @@index([nameKey(ops: raw("gin_trgm_ops"))], type: Gin, map: "exercise_names_name_key_trgm_idx")
+  @@map("exercise_names")
+}
+
+enum MuscleRole {
+  primary
+  secondary
+}
+
+model ExerciseMuscleGroup {
+  exerciseId      String      @map("exercise_id") @db.Uuid
+  muscleGroupCode String      @map("muscle_group_code") @db.VarChar(32)
+  role            MuscleRole
+  exercise        Exercise    @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  muscleGroup     MuscleGroup @relation(fields: [muscleGroupCode], references: [code], onDelete: Cascade)
+
+  @@id([exerciseId, muscleGroupCode])
+  @@index([muscleGroupCode, exerciseId])
+  @@map("exercise_muscle_groups")
+}
+
+/// One exercise performed by one user at one instant. No users table: auth is out of scope.
+model WorkoutEntry {
+  id               String       @id @default(uuid(7)) @db.Uuid
+  userId           String       @map("user_id") @db.VarChar(64)
+  exerciseId       String       @map("exercise_id") @db.Uuid
+  performedAt      DateTime     @map("performed_at") @db.Timestamptz(3)
+  /// Offset the client sent with `date`, so the local calendar day can be rebuilt.
+  utcOffsetMinutes Int          @map("utc_offset_minutes") @db.SmallInt
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  exercise         Exercise     @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+  sets             WorkoutSet[]
+
+  @@index([userId, performedAt(sort: Desc), id(sort: Desc)])
+  @@index([userId, exerciseId, performedAt(sort: Desc), id(sort: Desc)])
+  @@map("workout_entries")
+}
+
+/// Original weight/unit as entered plus normalized kg and derived metrics computed at write time.
+/// user_id, exercise_id and performed_at are copied from the entry on purpose: PR queries then read
+/// a single covering index (entries are immutable in this scope, so the copies cannot drift).
+model WorkoutSet {
+  id          String       @id @default(uuid(7)) @db.Uuid
+  entryId     String       @map("entry_id") @db.Uuid
+  setNumber   Int          @map("set_number") @db.SmallInt
+  reps        Int
+  weight      Decimal      @db.Decimal(8, 3)
+  unit        String       @db.VarChar(16)
+  weightKg    Decimal      @map("weight_kg") @db.Decimal(10, 4)
+  volumeKg    Decimal      @map("volume_kg") @db.Decimal(12, 4)
+  e1rmKg      Decimal      @map("e1rm_kg") @db.Decimal(10, 4)
+  userId      String       @map("user_id") @db.VarChar(64)
+  exerciseId  String       @map("exercise_id") @db.Uuid
+  performedAt DateTime     @map("performed_at") @db.Timestamptz(3)
+  entry       WorkoutEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  exercise    Exercise     @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+
+  @@unique([entryId, setNumber])
+  @@index([userId, exerciseId, performedAt, weightKg, reps, volumeKg, e1rmKg], map: "workout_sets_pr_covering_idx")
+  @@map("workout_sets")
+}
+
+/// Stored responses for safe client retries of POST /workouts (Idempotency-Key header).
+model IdempotencyKey {
+  userId         String   @map("user_id") @db.VarChar(64)
+  key            String   @db.VarChar(128)
+  requestHash    String   @map("request_hash") @db.Char(64)
+  responseStatus Int      @map("response_status") @db.SmallInt
+  responseBody   Json     @map("response_body")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@id([userId, key])
+  @@index([createdAt])
+  @@map("idempotency_keys")
 }
