@@ -25,4 +25,7 @@
 ## Consequences
 
 - Contributors need Node 24 (`nvm use`). Node 22 would also run the app but not the Nest CLI or Jest with v12.
+- Jest loads Nest 12's ESM-only packages through `require(esm)` only when Node exposes `vm.SourceTextModule`,
+  which needs `--experimental-vm-modules` (verified in `jest-runtime` 30.5.2 source: `supportsSyncEvaluate` checks
+  `vm.SourceTextModule.prototype.hasAsyncGraph`). The `test` scripts pass this flag; plain `npx jest` will fail.
 - If a Nest 12 incompatibility appears, fall back to Nest 11 with a new ADR.

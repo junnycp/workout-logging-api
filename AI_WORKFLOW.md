@@ -92,6 +92,16 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   scaffolding, the same way library capabilities were checked in C1.
 - **Commit:** the ADR commit at the start of branch `m1`.
 
+### C8 — Incomplete assumption about Jest with NestJS 12 (2026-10-05, M1 scaffold)
+- **AI output:** The M1 plan and ADR 0001 stated that Jest can load NestJS 12's ESM-only packages on Node >= 24.9
+  (taken from the NestJS migration guide; the Jest docs say no flag is needed).
+- **How detected:** The first DI smoke test failed on Node 24.21 with "Must use import to load ES Module". The AI
+  read `jest-runtime`'s source: `require(esm)` is only enabled when `vm.SourceTextModule` exists, which Node exposes
+  only with `--experimental-vm-modules`. Verified by running the test with and without the flag.
+- **Outcome:** `npm test` / `npm run test:e2e` run Jest through Node with `--experimental-vm-modules`; documented in
+  ADR 0001. Lesson: when docs and behaviour disagree, read the source and prove it with a minimal test.
+- **Commit:** `chore: scaffold NestJS 12 app ...` on branch `m1`.
+
 ## 4. Rejected AI suggestions
 
 | Date | Decision | AI suggested | I decided | Reason |
