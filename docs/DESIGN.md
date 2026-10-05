@@ -304,15 +304,20 @@ Perf: `npm run seed:perf` + `npm run perf:explain` (script, not part of the test
 
 | M | Scope | Est. (h) | Example commits |
 |---|-------|----------|-----------------|
-| M1 | Scaffold: Nest, strict TS, lint, config (zod), pino, error envelope + filter, health, Swagger, Dockerfile, compose | 3–4 | `chore: scaffold NestJS app`, `feat(common): structured error envelope`, `build: docker compose with postgres` |
-| M2 | DB: Prisma schema, migrations (tables, indexes, pg_trgm), exercise catalog JSON (~50 exercises + aliases) + sync, Testcontainers harness | 3.5–4.5 | `feat(db): schema and indexes`, `feat(exercises): configurable muscle-group catalog` |
+| M1 | Scaffold: Nest, strict TS, lint, config (zod), pino, error envelope + filter, health, Swagger, Dockerfile, compose | 3.5–4.5 | `chore: scaffold NestJS app`, `feat(common): structured error envelope`, `build: docker compose with postgres` |
+| M2 | DB: Prisma schema, migrations (tables, indexes, pg_trgm), exercise catalog JSON (~50 exercises + aliases) + sync, Testcontainers harness | 3.5–5 | `feat(db): schema and indexes`, `feat(exercises): configurable muscle-group catalog` |
 | M3 | Domain (TDD): units, metrics, time, cursor, normalization | 2 | `test(units): ...` then `feat(units): ...` |
 | M4 | POST bulk + idempotency + concurrency tests | 4–5 | `feat(workouts): bulk logging`, `feat(workouts): idempotency key` |
-| M5 | GET history + filters + pagination + unit output | 4–5 | `feat(workouts): history with keyset pagination` |
+| M5 | GET history + filters + keyset pagination (typed raw query) + unit output | 4.5–5.5 | `feat(workouts): history with keyset pagination` |
 | M6 | PRs + compare | 4–5 | `feat(records): personal records`, `feat(records): period comparison` |
 | M7 | Perf seed, EXPLAIN evidence, index tuning | 1.5–2 | `perf: seed 50k entries and document query plans` |
 | M8 | README (diagram, API, schema, trade-offs, 10k coaches), AI_WORKFLOW.md, review & refactor | 4–5 | `docs: ...` |
+| — | Cross-milestone edge-case and integration test hardening | 4–5 | `test: ...` |
+| — | Review, refactoring, buffer | 2–3 | `refactor: ...` |
 | — | Video (recorded by you; I prepare a script outline) | 2–3 | — |
+
+Milestone hours are a working breakdown and differ slightly by rounding. The authoritative estimate,
+including its post-design revision (34.5–45 h, target ≈ 39.5 h), is `docs/ESTIMATION.md`.
 
 Within each milestone: write tests first for domain logic → implement → `lint + typecheck + test` →
 independent review (`/code-review` or `technical-leader`) → you review → commit(s). Corrections found in review
