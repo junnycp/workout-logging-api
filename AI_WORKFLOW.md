@@ -183,6 +183,23 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   unreachable code like that stray return. Lesson: an approved spec is changed by asking, not by implementing.
 - **Commit:** `fix(time): ...` on branch `m3`.
 
+### C15 — A 500 on tiny weights and three smaller M4 issues (2026-10-05, M4)
+- **AI output:** M4 passed 145 unit and 54 e2e tests, including a 20-way concurrency suite.
+- **How detected:**
+  1. (must-fix, independent review with a live probe) `"weight": 1e-7` returned **500**: class-validator's
+     `maxDecimalPlaces` splits `toString()` on ".", and exponent forms have none, so it throws;
+  2. (review) if the key was reported taken but could not be re-read, the service would have returned a 201
+     for rolled-back rows — impossible today (keys are never deleted) but one retention job away;
+  3. (review) the interactive transaction held a pool connection while blocked on a concurrent key;
+  4. (self, before implementing) a hand-computed expected volume in the e2e spec was wrong (671.3169 vs
+     671.3167); all expected decimals were then recomputed with Python's `decimal`;
+  5. (self) the concurrency test compared replayed bodies as strings; JSONB reorders object keys, so equal
+     content looked different. Verified the JSONB behaviour, then compared canonical JSON instead.
+- **Outcome:** custom `@MaxDecimalPlaces` using decimal.js (e2e cases `1e-7`, `-1e-7`, `1.0005`), the repository
+  returns the stored response together with "key taken", batch (array) transaction, DESIGN note that idempotency
+  matching is strict (a case-only change of `exerciseName` is a different body → 409).
+- **Commit:** `fix(workouts): ...` on branch `m4`.
+
 ## 4. Rejected AI suggestions
 
 | Date | Decision | AI suggested | I decided | Reason |
