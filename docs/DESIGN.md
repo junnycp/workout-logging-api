@@ -168,6 +168,8 @@ Headers: optional `Idempotency-Key`.
 - Same `Idempotency-Key` + same body (key order irrelevant) → replays the stored response (`200`, header
   `Idempotent-Replayed: true`; same content, object key order may differ because it is stored as JSONB);
   same key + different body → `409 IDEMPOTENCY_KEY_REUSED`. Keys are per user, kept indefinitely (M4-E1).
+  "Same body" is strict (raw JSON, key order ignored): a retry that only changes the case of `exerciseName`
+  is a different body and gets 409, like Stripe. Number formatting (`10` vs `10.0`) does not matter.
 
 ### 4.2 `GET /api/v1/users/:userId/workouts` — history (R2.x)
 Query: `exercise` (partial, case-insensitive), `from`, `to` (date or datetime, inclusive), `tz` (IANA,

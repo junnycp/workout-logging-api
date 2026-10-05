@@ -169,7 +169,23 @@ describe('POST /api/v1/users/:userId/workouts (e2e)', () => {
       [
         'weight with 4 decimals',
         { entries: [bench({ sets: [{ reps: 5, weight: 100.1234, unit: 'kg' }] })] },
-        { path: 'entries[0].sets[0].weight', code: 'IS_NUMBER' },
+        { path: 'entries[0].sets[0].weight', code: 'MAX_DECIMAL_PLACES' },
+      ],
+      // Review finding: exponent-form numbers made class-validator's maxDecimalPlaces throw (500).
+      [
+        'tiny weight in exponent form',
+        { entries: [bench({ sets: [{ reps: 5, weight: 1e-7, unit: 'kg' }] })] },
+        { path: 'entries[0].sets[0].weight', code: 'MAX_DECIMAL_PLACES' },
+      ],
+      [
+        'tiny negative weight',
+        { entries: [bench({ sets: [{ reps: 5, weight: -1e-7, unit: 'kg' }] })] },
+        { path: 'entries[0].sets[0].weight', code: 'MIN' },
+      ],
+      [
+        'weight 1.0005',
+        { entries: [bench({ sets: [{ reps: 5, weight: 1.0005, unit: 'kg' }] })] },
+        { path: 'entries[0].sets[0].weight', code: 'MAX_DECIMAL_PLACES' },
       ],
       [
         'weight as a string',

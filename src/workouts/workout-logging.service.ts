@@ -76,10 +76,9 @@ export class WorkoutLoggingService {
         ? { userId, key: idempotencyKey, requestHash: hash, status: HttpStatus.CREATED, body }
         : undefined,
     );
-    if (outcome === 'idempotency-key-taken' && idempotencyKey !== undefined && hash !== undefined) {
+    if (outcome.kind === 'idempotency-key-taken' && hash !== undefined) {
       // A concurrent request with the same key committed first; this one was rolled back.
-      const stored = await this.repository.findStoredResponse(userId, idempotencyKey);
-      if (stored) return this.replay(stored, hash);
+      return this.replay(outcome.stored, hash);
     }
     return { status: HttpStatus.CREATED, body, replayed: false };
   }

@@ -15,6 +15,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { MaxDecimalPlaces } from '../../common/validation/max-decimal-places.validator';
 import { IsWeightUnit } from '../../units/is-weight-unit.validator';
 import { WEIGHT_UNITS } from '../../units/weight-units';
 
@@ -36,7 +37,8 @@ export class WorkoutSetInputDto {
     description: 'In `unit`; at most 3 decimals. 0 = bodyweight.',
   })
   @IsDefined()
-  @IsNumber({ allowNaN: false, allowInfinity: false, maxDecimalPlaces: 3 })
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @MaxDecimalPlaces(3)
   @Min(0)
   @Max(2000)
   weight!: number;
