@@ -71,7 +71,7 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
 - **How detected:** The AI's own report stated the push; I had approved commits only, not a push.
 - **Outcome:** No harm (private repo, correct account), but the rule was tightened: `CLAUDE.md` now states that
   commit approval is not push approval and pushes need an explicit request. Also stored in the agent's memory.
-- **Commit:** pushed range `a68da97..044d005`; rule added in the commit that follows this entry.
+- **Commit:** pushed range `a68da97..044d005`; rule added in `f5efa4a`.
 
 ### C6 — Arithmetic errors in the time estimate (2026-10-05, estimation)
 - **AI output:** The pre-start estimate's total row said 33–43 h while its rows sum to 32.5–42 h. The post-design
@@ -79,7 +79,7 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
 - **How detected:** Before pushing, the AI recomputed every row with a script instead of trusting its own sums.
 - **Outcome:** Revision corrected to 34–44 h (target ≈ 39 h); the original table is kept as written, with a note
   about its summing error. Lesson: compute totals with code, not by hand.
-- **Commit:** correction committed separately after `53aa1eb`.
+- **Commit:** `c84cb62` (correction of `53aa1eb`).
 
 ### C7 — Outdated stack versions written from memory (2026-10-05, M1 planning)
 - **AI output:** The `CLAUDE.md` written on 2026-10-02 specified "Node.js 20 LTS" and "NestJS 11" without checking
@@ -90,7 +90,7 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
 - **Outcome:** Node 24.21.0, NestJS 12 (CommonJS), TypeScript 6.0 pinned; recorded in
   `docs/adr/0001-runtime-versions.md` and `CLAUDE.md`. Lesson: check versions against the registry before
   scaffolding, the same way library capabilities were checked in C1.
-- **Commit:** the ADR commit at the start of branch `m1`.
+- **Commit:** `cee5cef` (ADR + CLAUDE.md stack update).
 
 ### C8 — Incomplete assumption about Jest with NestJS 12 (2026-10-05, M1 scaffold)
 - **AI output:** The M1 plan and ADR 0001 stated that Jest can load NestJS 12's ESM-only packages on Node >= 24.9
@@ -100,7 +100,7 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   only with `--experimental-vm-modules`. Verified by running the test with and without the flag.
 - **Outcome:** `npm test` / `npm run test:e2e` run Jest through Node with `--experimental-vm-modules`; documented in
   ADR 0001. Lesson: when docs and behaviour disagree, read the source and prove it with a minimal test.
-- **Commit:** `chore: scaffold NestJS 12 app ...` on branch `m1`.
+- **Commit:** `8100d7d`.
 
 ### C9 — Unit test encoded a wrong assumption about Nest's error pipeline (2026-10-05, M1 error envelope)
 - **AI output:** The first exception filter handled raw body-parser errors (`type: 'entity.parse.failed'`), and its
@@ -113,7 +113,7 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   `AppException` (unit-tested), and a request-id middleware runs before the parser. Verified again with curl.
   Lesson: unit tests with hand-made inputs only prove what you assumed; a live or e2e check is needed at framework
   boundaries.
-- **Commit:** `feat(common): global exception filter and error envelope` on branch `m1`.
+- **Commit:** `3816cb5`.
 
 ### C10 — Error envelope did not cover routes outside the API prefix (2026-10-05, M1 health)
 - **AI output:** Commit `3816cb5` claimed every error used the envelope, but `GET /foo` still returned Express' HTML
@@ -123,7 +123,7 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   only registered under the global prefix. Re-reading its own diff caught the false comment.
 - **Outcome:** A not-found fallback registered after `app.init()` renders the envelope for any unmatched route, a
   shared `errorBody()` keeps one shape, and the health controller now really logs failing dependencies.
-- **Commit:** `fix(common): ...` and `feat(health): ...` on branch `m1`.
+- **Commit:** `7308300` (fallback + `errorBody()`), `e820565` (health logs failing dependencies).
 
 ### C11 — Committed a health endpoint that broke application startup (2026-10-05, M1 health)
 - **AI output:** Commit `e820565` injected the logger with `@InjectPinoLogger(HealthController.name)`. The AI ran
@@ -135,7 +135,7 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
 - **Outcome:** Both classes now inject `PinoLogger` directly and call `setContext()` (no import-order dependency).
   Fixed in a separate commit rather than rewriting history. Lesson: static checks do not prove the app boots;
   the e2e boot test planned for M1 is the safety net, and live-check results must be read before committing.
-- **Commit:** `fix(health): ...` after `e820565` on branch `m1`.
+- **Commit:** `e27decb` (fix of `e820565`).
 
 ### C12 — Gaps found by the independent review of M1 (2026-10-05, M1 review)
 - **AI output:** The M1 branch passed lint, typecheck, 30 unit and 8 e2e tests and a clean-clone
@@ -152,7 +152,7 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   hidden and logged, one pino-http instance is mounted before the body parser and shared with nestjs-pino
   (`useExisting`), and a wiring test (which revealed that `forRoot()` is async in Nest 12). Not changed: the
   reviewer's suggestion to add codes for 409/422 — services only throw `AppException` with explicit codes.
-- **Commit:** the `fix(...)` / `test(config)` commits after `92da5eb` on branch `m1`.
+- **Commit:** `5f677d4` (items 1, 3), `ae990ba` (item 2), `e6fc159` (item 4).
 
 ### C13 — Catalog validation and sync gaps found by the M2 review (2026-10-05, M2 review)
 - **AI output:** The catalog parser and sync passed 52 unit and 16 integration tests.
@@ -164,7 +164,7 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
 - **Outcome:** Fixed with failing tests first. Not done, deliberately: a stable catalog key to survive
   renames (design change, raised with the reviewer) and a composite FK to keep the copied set columns equal
   to their entry (deferred to M4 as an integration assertion, to avoid an extra index on a 50k-row table).
-- **Commit:** `fix(exercises): reject duplicate names and overlong keys; retire stale names` on branch `m2`.
+- **Commit:** `94f0518`.
 
 ### C14 — Date parsing gaps, a silent spec deviation and a self-inflicted bug (2026-10-05, M3)
 - **AI output:** M3 time helpers passed 126 unit tests.
@@ -181,7 +181,7 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   legacy `Asia/Saigon`, so valid names are kept as given and only UTC spellings are normalized.
 - **Outcome:** All fixed test-first; `allowUnreachableCode: false` added to `tsconfig.json` so `tsc` rejects
   unreachable code like that stray return. Lesson: an approved spec is changed by asking, not by implementing.
-- **Commit:** `fix(time): ...` on branch `m3`.
+- **Commit:** `1e1fa6a`.
 
 ### C15 — A 500 on tiny weights and three smaller M4 issues (2026-10-05, M4)
 - **AI output:** M4 passed 145 unit and 54 e2e tests, including a 20-way concurrency suite.
@@ -198,7 +198,7 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
 - **Outcome:** custom `@MaxDecimalPlaces` using decimal.js (e2e cases `1e-7`, `-1e-7`, `1.0005`), the repository
   returns the stored response together with "key taken", batch (array) transaction, DESIGN note that idempotency
   matching is strict (a case-only change of `exerciseName` is a different body → 409).
-- **Commit:** `fix(workouts): ...` on branch `m4`.
+- **Commit:** `7d44589`.
 
 ## 4. Rejected AI suggestions
 
