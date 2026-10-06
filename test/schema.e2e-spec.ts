@@ -1,10 +1,10 @@
-import { PrismaPg } from '@prisma/adapter-pg';
+import { createPgAdapter } from '../src/database/pg-adapter';
 import { PrismaClient } from '../src/generated/prisma/client';
 
 /** Guards the index strategy in docs/DESIGN.md: a migration that drops one of these fails the build. */
 describe('Database schema (integration)', () => {
   const prisma = new PrismaClient({
-    adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL as string }),
+    adapter: createPgAdapter(process.env.DATABASE_URL as string),
   });
 
   afterAll(async () => {

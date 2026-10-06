@@ -38,6 +38,23 @@ describe('weight unit registry', () => {
     expect(() => weightUnits.toKg(d(1), 'stone')).toThrow('Unsupported weight unit: stone');
   });
 
+  describe('convert (display a logged weight in another unit)', () => {
+    it('returns the original value unchanged when the units match', () => {
+      expect(weightUnits.convert(d('185.125'), 'lb', 'lb').toString()).toBe('185.125');
+    });
+
+    it('converts exactly from the original value, leaving rounding to the caller', () => {
+      // Rounded once this is 14.51; via the stored 4-decimal 14.5150 it would become 14.52 (C16).
+      expect(weightUnits.convert(d(32), 'lb', 'kg').toString()).toBe('14.51495584');
+      expect(weightUnits.convert(d(100), 'kg', 'lb').toFixed(2)).toBe('220.46');
+    });
+
+    it('throws on an unsupported unit on either side', () => {
+      expect(() => weightUnits.convert(d(1), 'st', 'kg')).toThrow('Unsupported weight unit: st');
+      expect(() => weightUnits.convert(d(1), 'kg', 'st')).toThrow('Unsupported weight unit: st');
+    });
+  });
+
   it('accepts a new unit with a single registry entry (extensibility, X1)', () => {
     const withStone = createWeightUnitRegistry([
       ...WEIGHT_UNITS,
@@ -46,6 +63,7 @@ describe('weight unit registry', () => {
     expect(withStone.codes()).toEqual(['kg', 'lb', 'st']);
     expect(withStone.toKg(d(10), 'st').toString()).toBe('63.5029318');
     expect(withStone.fromKg(d('63.5029318'), 'lb').toFixed(4)).toBe('140.0000');
+    expect(withStone.convert(d(10), 'st', 'lb').toFixed(4)).toBe('140.0000');
   });
 
   it('rejects an invalid registry definition at startup', () => {

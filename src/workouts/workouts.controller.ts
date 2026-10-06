@@ -1,4 +1,15 @@
-import { Body, Controller, Headers, HttpStatus, Param, Post, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+  Req,
+  Res,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiConflictResponse,
@@ -14,6 +25,8 @@ import { ErrorCode } from '../common/errors/error-codes';
 import { ErrorResponseDto } from '../common/openapi/error-response.dto';
 import { CreateWorkoutsDto, UserParamsDto } from './dto/create-workouts.dto';
 import { CreatedWorkoutsResponseDto } from './dto/created-workouts.dto';
+import { WorkoutHistoryQueryDto, WorkoutHistoryResponseDto } from './dto/workout-history.dto';
+import { WorkoutHistoryService } from './workout-history.service';
 import { WorkoutLoggingService } from './workout-logging.service';
 
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9_.:-]{1,128}$/;
@@ -21,7 +34,29 @@ const IDEMPOTENCY_KEY = /^[A-Za-z0-9_.:-]{1,128}$/;
 @ApiTags('workouts')
 @Controller('users/:userId/workouts')
 export class WorkoutsController {
-  constructor(private readonly logging: WorkoutLoggingService) {}
+  constructor(
+    private readonly logging: WorkoutLoggingService,
+    private readonly historyService: WorkoutHistoryService,
+  ) {}
+
+  @Get()
+  @ApiOperation({
+    summary: 'Workout history, newest first, with cursor pagination',
+    description:
+      'Filters combine with AND. An empty result is 200 with `data: []` and `meta.message`. Pass ' +
+      '`meta.nextCursor` as `cursor` for the next page.',
+  })
+  @ApiOkResponse({ type: WorkoutHistoryResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    description: 'VALIDATION_ERROR, INVALID_DATE_RANGE, INVALID_CURSOR or UNKNOWN_MUSCLE_GROUP',
+  })
+  history(
+    @Param() { userId }: UserParamsDto,
+    @Query() query: WorkoutHistoryQueryDto,
+  ): Promise<WorkoutHistoryResponseDto> {
+    return this.historyService.history(userId, query);
+  }
 
   @Post()
   @ApiOperation({

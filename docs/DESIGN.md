@@ -172,19 +172,42 @@ Headers: optional `Idempotency-Key`.
   is a different body and gets 409, like Stripe. Number formatting (`10` vs `10.0`) does not matter.
 
 ### 4.2 `GET /api/v1/users/:userId/workouts` — history (R2.x)
-Query: `exercise` (partial, case-insensitive), `from`, `to` (date or datetime, inclusive), `tz` (IANA,
-default UTC), `muscleGroup`, `unit` (if omitted, each set is returned in the unit it was logged in),
-`limit` (default 20, max 100), `cursor`.
+Query (all optional, combined with AND; unknown parameters → 400 `UNKNOWN_FIELD`):
+
+| Param | Meaning | Errors |
+|-------|---------|--------|
+| `exercise` | Part of a canonical name or alias, normalized like names (case/space-insensitive), matched literally (`%`, `_` escaped) | `MAX_LENGTH`, `BLANK` |
+| `muscleGroup` | Catalog code, case-insensitive; matches exercises that train it as **primary or secondary** (M5-B) | 400 `UNKNOWN_MUSCLE_GROUP` (lists valid codes) |
+| `from`, `to` | Inclusive; date-only (whole local day in `tz`) or datetime with offset | `INVALID_DATE`, `MISSING_OFFSET`; 400 `INVALID_DATE_RANGE` if from > to |
+| `tz` | IANA zone for date-only bounds, default `UTC` | `INVALID_TIMEZONE` |
+| `unit` | Return every weight in this unit; omitted = each set as logged | `UNSUPPORTED_UNIT` |
+| `limit` | 1–100, default 20 | `IS_INT`, `MIN`, `MAX` |
+| `cursor` | `meta.nextCursor` of the previous page | 400 `INVALID_CURSOR` |
+
 ```json
 {
-  "data": [ { "id": "...", "exercise": { "id": "...", "name": "Bench Press", "muscleGroups": ["chest","triceps"] },
-             "performedAt": "2026-10-01T11:30:00.000Z", "localDate": "2026-10-01",
+  "data": [ { "id": "...", "performedAt": "2026-10-01T11:30:00.000Z", "localDate": "2026-10-01", "utcOffsetMinutes": 420,
+             "exercise": { "id": "...", "name": "Bench Press",
+                           "muscleGroups": [ { "code": "chest", "role": "primary" }, { "code": "triceps", "role": "secondary" } ] },
              "sets": [ { "setNumber": 1, "reps": 5, "weight": 220.46, "unit": "lb" } ] } ],
-  "meta": { "limit": 20, "nextCursor": "eyJ...", "hasMore": true, "unit": "lb", "timezone": "Asia/Ho_Chi_Minh" }
+  "meta": { "limit": 20, "hasMore": true, "nextCursor": "eyJ...", "unit": "lb", "timezone": "Asia/Ho_Chi_Minh" }
 }
 ```
-Empty: `{ "data": [], "meta": { ..., "message": "No workouts found for the given filters." } }`.
-No total count (an exact `COUNT(*)` over 50k rows per page request is wasted work for infinite scroll; documented).
+- Order: `(performed_at DESC, id DESC)`; sets by `setNumber`. `localDate` is the date at the offset the entry was
+  logged with (M5-C), the same value POST returned; `tz` only decides range boundaries.
+- Weights: in their logged unit, returned exactly as logged; otherwise converted from the logged value and rounded
+  once to 2 decimals (§5 Rounding).
+- Empty (no data, a name that matches no exercise (M5-D), or past the last page): `200`, `data: []`,
+  `hasMore: false`, `nextCursor: null`, `meta.message: "No workouts found for the given filters."`.
+- No total count (an exact `COUNT(*)` over 50k rows per page request is wasted work for infinite scroll).
+  A cursor is a position, not bound to the filters: reused with other filters it continues from that point.
+- Queries (at most 5): name match and/or muscle-group ids, the page, its sets, its exercises. The page is one
+  parameterized raw query: without an exercise filter a row-comparison scan of `(user_id, performed_at DESC, id DESC)`;
+  with one, a `LATERAL` per matched exercise on `(user_id, exercise_id, performed_at DESC, id DESC)`, each `LIMIT
+  limit+1`, then merged (M5-A). Cost ≤ matched exercises × (limit + 1) index rows, independent of page depth and
+  of how the user's data is distributed (`exercise_id = ANY(...)` skipped ~21k rows on skewed data in the M5
+  spike). Trade-off: a broad term (`?exercise=e`) can match most of the closed catalog (~50 ids → ~5k index rows);
+  acceptable for a curated catalog, revisit if it grows to thousands.
 
 ### 4.3 `GET /api/v1/users/:userId/personal-records?exercise=Bench%20Press` — PRs (R3.1–R3.4)
 Query: `exercise` (exact after normalization), optional `from`, `to`, `tz`, `unit` (default kg).
@@ -271,6 +294,10 @@ Codes are defined in `src/common/errors/error-codes.ts`; detail codes come from 
   its tz; a user who travels will see buckets in the tz they query with; DST days are 23/25 h, handled by Luxon
   not by adding 24 h. Alternative considered: store a `local_date` column (stable buckets regardless of query tz)
   — rejected as primary because ranges across zones become ambiguous; `utc_offset_minutes` keeps it recoverable.
+- Database sessions are pinned to `TimeZone=UTC` (`src/database/pg-adapter.ts`): `@prisma/adapter-pg` sends JS
+  Dates without an offset, which Postgres reads in the session zone, so a non-UTC server default would shift every
+  stored instant and query bound (found in the M5 review, C17; covered by an e2e test on a database whose
+  default zone is Asia/Ho_Chi_Minh).
 
 ## 7. Concurrency (E5)
 

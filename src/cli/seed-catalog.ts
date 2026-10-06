@@ -1,5 +1,5 @@
-import { PrismaPg } from '@prisma/adapter-pg';
 import { envSchema } from '../config/env.schema';
+import { createPgAdapter } from '../database/pg-adapter';
 import { syncExerciseCatalog } from '../exercises/catalog/catalog-sync';
 import { DEFAULT_CATALOG_PATH, loadExerciseCatalog } from '../exercises/catalog/load-catalog';
 import { PrismaClient } from '../generated/prisma/client';
@@ -12,7 +12,7 @@ import { PrismaClient } from '../generated/prisma/client';
 async function main(): Promise<void> {
   const { DATABASE_URL } = envSchema.pick({ DATABASE_URL: true }).parse(process.env);
   const catalogPath = process.env.CATALOG_PATH ?? DEFAULT_CATALOG_PATH;
-  const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: DATABASE_URL }) });
+  const prisma = new PrismaClient({ adapter: createPgAdapter(DATABASE_URL) });
   try {
     const report = await syncExerciseCatalog(prisma, loadExerciseCatalog(catalogPath));
     console.log(
