@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import { createWeightUnitRegistry, WEIGHT_UNITS } from '../../units/weight-units';
-import { compareRecords, recordValue } from './record-metrics';
+import { compareRecords, pickRecord, recordValue } from './record-metrics';
 
 const d = (value: string | number) => new Decimal(value);
 const set = (reps: number, weight: number | string, unit = 'kg') => ({
@@ -66,5 +66,46 @@ describe('compareRecords (current period against the previous one)', () => {
     ['both periods', null, null],
   ])('is null when %s has no record', (_case, current, previous) => {
     expect(compareRecords(current, previous)).toBeNull();
+  });
+});
+
+describe('pickRecord (the winner among candidates tied on the stored 4-decimal value)', () => {
+  const candidate = (id: string, reps: number, weight: string, unit: string, at: string) => ({
+    id,
+    reps,
+    weight: d(weight),
+    unit,
+    performedAt: new Date(at),
+  });
+
+  it('prefers the higher exact value over more reps', () => {
+    // 20.051 lb = 9.09498061… kg and 9.095 kg are both stored as 9.0950.
+    const lighter = candidate('a', 10, '20.051', 'lb', '2026-09-01T10:00:00Z');
+    const heavier = candidate('b', 5, '9.095', 'kg', '2026-09-01T10:00:00Z');
+    expect(pickRecord('maxWeight', [lighter, heavier])?.id).toBe('b');
+  });
+
+  it('then prefers more reps, then the earliest date, then the lowest id (decision D4)', () => {
+    const base = (id: string, reps: number, at: string) => candidate(id, reps, '100', 'kg', at);
+    expect(
+      pickRecord('maxWeight', [base('a', 3, '2026-09-01'), base('b', 5, '2026-09-08')])?.id,
+    ).toBe('b');
+    expect(
+      pickRecord('maxWeight', [base('b', 5, '2026-09-08'), base('a', 5, '2026-09-01')])?.id,
+    ).toBe('a');
+    expect(
+      pickRecord('maxWeight', [base('b', 5, '2026-09-01'), base('a', 5, '2026-09-01')])?.id,
+    ).toBe('a');
+  });
+
+  it('ranks volume and Epley by their exact values too', () => {
+    const a = candidate('a', 10, '20.051', 'lb', '2026-09-01T10:00:00Z');
+    const b = candidate('b', 10, '9.095', 'kg', '2026-09-02T10:00:00Z');
+    expect(pickRecord('maxVolume', [a, b])?.id).toBe('b');
+    expect(pickRecord('bestEstimated1RM', [a, b])?.id).toBe('b');
+  });
+
+  it('returns null without candidates', () => {
+    expect(pickRecord('maxWeight', [])).toBeNull();
   });
 });
