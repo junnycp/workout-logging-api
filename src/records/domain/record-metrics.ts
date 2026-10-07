@@ -34,6 +34,32 @@ export function recordValue(
   }
 }
 
+export interface RecordCandidate extends LoggedSet {
+  id: string;
+  performedAt: Date;
+}
+
+/**
+ * The record among candidates, by decision D4 on exact values: higher value, more reps, earliest
+ * performed_at, lowest set id. The database ranks on 4-decimal stored kg, which can tie sets whose exact
+ * values differ (20.051 lb and 9.095 kg are both 9.0950 kg); rounding is monotonic, so the true record is
+ * always among the sets tied on the highest stored value, and this settles them exactly.
+ */
+export function pickRecord<T extends RecordCandidate>(
+  metric: RecordMetric,
+  candidates: readonly T[],
+): T | null {
+  const ranked = candidates.map((set) => ({ set, value: recordValue(metric, set, 'kg') }));
+  ranked.sort(
+    (a, b) =>
+      b.value.comparedTo(a.value) ||
+      b.set.reps - a.set.reps ||
+      a.set.performedAt.getTime() - b.set.performedAt.getTime() ||
+      (a.set.id < b.set.id ? -1 : a.set.id > b.set.id ? 1 : 0),
+  );
+  return ranked[0]?.set ?? null;
+}
+
 export interface RecordDelta {
   absolute: number;
   percent: number;
