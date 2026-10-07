@@ -63,7 +63,7 @@ export function pickRecord<T extends RecordCandidate>(
 export interface RecordDelta {
   absolute: number;
   percent: number;
-  /** Strictly better than the previous period; an equal record is not an improvement. */
+  /** `absolute` > 0: better by at least what the client can see (0.01); equal or less is not improved. */
   improved: boolean;
 }
 
@@ -77,9 +77,11 @@ export function compareRecords(
 ): RecordDelta | null {
   if (current === null || previous === null) return null;
   const change = current.minus(previous);
+  const absolute = roundForResponse(change);
   return {
-    absolute: roundForResponse(change),
+    absolute,
     percent: roundForResponse(change.dividedBy(previous).times(100)),
-    improved: change.gt(0),
+    // From the rounded change, so `improved` never contradicts the `absolute` the client sees.
+    improved: absolute > 0,
   };
 }
