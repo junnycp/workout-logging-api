@@ -4,6 +4,7 @@ import { LoggingModule } from './common/logging/logging.module';
 import { AppConfigModule } from './config/app-config.module';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
+import { RecordsModule } from './records/records.module';
 import { WorkoutsModule } from './workouts/workouts.module';
 
 @Module({
@@ -14,6 +15,7 @@ import { WorkoutsModule } from './workouts/workouts.module';
     DatabaseModule,
     HealthModule,
     WorkoutsModule,
+    RecordsModule,
   ],
 })
 export class AppModule {}
