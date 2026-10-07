@@ -104,7 +104,7 @@ model WorkoutSet {
   exercise    Exercise     @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
 
   @@unique([entryId, setNumber])
-  @@index([userId, exerciseId, performedAt, weightKg, reps, volumeKg, e1rmKg], map: "workout_sets_pr_covering_idx")
+  @@index([userId, exerciseId, performedAt, weightKg, reps, volumeKg, e1rmKg, id], map: "workout_sets_pr_covering_idx")
   @@map("workout_sets")
 }
 
