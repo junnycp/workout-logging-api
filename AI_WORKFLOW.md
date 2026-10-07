@@ -249,6 +249,21 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   `@ApiHeader` the same lower-case name, so Swagger merges the two and keeps the description.
 - **Commit:** `dc2041a` (test), `7069ab0` (fix).
 
+### C20 — "Index-only PR scans" that were never index-only (2026-10-06, M6 analysis)
+- **AI output:** The approved design (DESIGN §3/§8, built in M2) described the covering index
+  `(user_id, exercise_id, performed_at, weight_kg, reps, volume_kg, e1rm_kg)` as giving "index-only PR scans".
+  The M2 review notes said the `id` tie-break would only need "a heap fetch at LIMIT 1, acceptable". The planning
+  spike in §13a had checked a PR query without the full D4 tie-break.
+- **How detected:** By the AI while analysing M6, before writing any PR code. It ran the real PR query
+  (metric, reps, earliest date, set id; `LIMIT 1`) on a 200k-set user. The plan was a Bitmap Index Scan plus a
+  heap read for every set of the user and exercise, not one heap read: 6–11 ms per metric for a realistic
+  50k-entry user, 61–84 ms in the worst case.
+- **Outcome:** Measured three options and explained them to me. I chose to add `id` as the last key column
+  (D10, reasons in DESIGN): Index Only Scan, 0 heap fetches, 2.6 ms. Rejected metric-leading indexes: they
+  made ranged queries 10× slower and cost 3 extra index writes per set. New migration; the applied one was not
+  edited.
+- **Commit:** `3c4e906` (decision), `9d44084` (test), `980f7f6` (migration).
+
 ## 4. Rejected AI suggestions
 
 | Date | Decision | AI suggested | I decided | Reason |
