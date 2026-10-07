@@ -205,6 +205,18 @@ describe('Personal records (e2e)', () => {
       expect(body.data.maxWeight).toMatchObject({ value: 9.1, setNumber: 2 });
     });
 
+    it('still finds the exact winner when more than 50 sets tie on the stored value', async () => {
+      // 50 × (20.051 lb × 10) rank before 9.095 kg × 5 in the database (same stored kg, more reps).
+      const userId = uniqueUserId();
+      const lighter: SetInput[] = Array.from({ length: 50 }, () => [10, 20.051, 'lb']);
+      await log(userId, [
+        entry('2026-09-01T10:00:00Z', lighter),
+        entry('2026-09-02T10:00:00Z', [[5, 9.095]]),
+      ]);
+      const body = await recordsBody(userId, { exercise: 'Bench Press' });
+      expect(winner(body.data.maxWeight)).toEqual([9.1, 5, 9.095, '2026-09-02']); // value rounded, set as logged
+    });
+
     it('prefers more reps when the value ties', async () => {
       const userId = uniqueUserId();
       await log(userId, [
