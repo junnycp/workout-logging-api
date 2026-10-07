@@ -191,6 +191,20 @@ describe('Personal records (e2e)', () => {
       expect(inLb.data.maxWeight?.set).toEqual({ reps: 1, weight: 225 }); // as logged, not re-rounded
     });
 
+    it('ranks by the exact value, not by the 4-decimal stored kg', async () => {
+      // 20.051 lb = 9.09498061… kg and 9.095 kg are both stored as 9.0950; the heavier one must win
+      // although the lighter one has more reps.
+      const userId = uniqueUserId();
+      await log(userId, [
+        entry('2026-09-01T10:00:00Z', [
+          [10, 20.051, 'lb'],
+          [5, 9.095],
+        ]),
+      ]);
+      const body = await recordsBody(userId, { exercise: 'Bench Press' });
+      expect(body.data.maxWeight).toMatchObject({ value: 9.1, setNumber: 2 });
+    });
+
     it('prefers more reps when the value ties', async () => {
       const userId = uniqueUserId();
       await log(userId, [
