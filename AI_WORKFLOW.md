@@ -238,6 +238,17 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   explicit error. (4) Rewrote DESIGN §4.2, including the cost bound of the LATERAL query as a trade-off.
 - **Commit:** `13db533` (test), `c2df428` (fix), `3ea2379` (docs).
 
+### C19 — Swagger listed Idempotency-Key as a required header (2026-10-06, M4 API docs)
+- **AI output:** M4 controller with `@ApiHeader({ name: 'Idempotency-Key', required: false })` while the handler
+  reads `@Headers('idempotency-key')`. `@nestjs/swagger` documents that parameter as well, marked required.
+  The names differed only in case, so the spec contained two headers. The existing OpenAPI test only checked
+  that the path existed.
+- **How detected:** I tried POST in Swagger UI and asked why a required `idempotency-key` header was needed.
+  `/docs-json` showed both entries. The API itself never required the header: a POST without it returned 201.
+- **Outcome:** Test first: the spec must contain exactly one Idempotency-Key header, optional. Then gave
+  `@ApiHeader` the same lower-case name, so Swagger merges the two and keeps the description.
+- **Commit:** `dc2041a` (test), `7069ab0` (fix).
+
 ## 4. Rejected AI suggestions
 
 | Date | Decision | AI suggested | I decided | Reason |

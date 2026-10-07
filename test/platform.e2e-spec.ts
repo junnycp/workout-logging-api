@@ -105,5 +105,19 @@ describe('Platform behaviour (e2e)', () => {
         expect.arrayContaining(['ErrorResponseDto', 'ErrorDto', 'ErrorDetailDto']),
       );
     });
+
+    it('documents Idempotency-Key once, as an optional header', async () => {
+      const res = await request(app.getHttpServer()).get('/docs-json').expect(200);
+      const document = res.body as {
+        paths: Record<
+          string,
+          { post: { parameters: { name: string; in: string; required?: boolean }[] } }
+        >;
+      };
+      const headers = (document.paths['/api/v1/users/{userId}/workouts']?.post.parameters ?? [])
+        .filter((p) => p.in === 'header' && p.name.toLowerCase() === 'idempotency-key')
+        .map((p) => p.required ?? false);
+      expect(headers).toEqual([false]);
+    });
   });
 });

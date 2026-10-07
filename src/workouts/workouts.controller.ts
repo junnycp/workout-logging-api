@@ -65,8 +65,10 @@ export class WorkoutsController {
       'Weights are stored as entered and normalized to kg. Exercises must exist in the catalog (names or ' +
       'aliases, case-insensitive). With Idempotency-Key, a retry of the same body returns the stored response.',
   })
+  // Same lower-case name as @Headers('idempotency-key') below: Swagger then merges the two into one optional
+  // header instead of listing an extra required one (HTTP header names are case-insensitive).
   @ApiHeader({
-    name: 'Idempotency-Key',
+    name: 'idempotency-key',
     required: false,
     description: 'Up to 128 characters: letters, digits, `_ . : -`. Scoped per user.',
   })
