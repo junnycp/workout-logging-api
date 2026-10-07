@@ -264,6 +264,27 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   edited.
 - **Commit:** `3c4e906` (decision), `9d44084` (test), `980f7f6` (migration).
 
+### C21 — Records ranked on rounded values, and an "improved" that contradicted the delta (2026-10-07, M6 review)
+- **AI output:** The M6 repository ordered each record by the 4-decimal stored kg, then reps, date and id (`bfced62`).
+  Its comment claimed rounding "can only create ties". The delta reported `improved` from exact values while
+  showing `absolute` rounded. 23 e2e and 12 unit tests passed.
+- **How detected:** The independent `technical-leader` review searched lb weights and found a pair:
+  20.051 lb × 10 = 9.09498 kg and 9.095 kg × 5 are both stored as 9.0950. The tie then went to more reps, so
+  the lighter set won (9.09 instead of 9.10), which breaks D4. Confirmed with a failing e2e test before
+  fixing. The same review found `{absolute: 0, improved: true}` for 100 lb against 45.359 kg, and noted that the
+  response bounds and messages differed from plan/M6.md.
+- **Outcome:**
+  - Each record now reads the top 50 stored candidates in the same Index Only Scan, keeps the sets tied on
+    the highest stored value, and settles them with a pure `pickRecord` on exact values. If all 50 tie, a
+    second query fetches every tie. Tested in unit tests and two e2e cases, one with 51 ties.
+  - `improved` = rounded `absolute > 0`.
+  - The plan's contract was replaced by the implemented one (inclusive UTC bounds), documented in DESIGN
+    4.3/4.4.
+  - Also from the review: compare queries its two periods one after the other.
+  - Deferred to M7: the planner's row estimate for correlated `user_id/exercise_id`.
+- **Commit:** `3291c0a`, `8ae7e6d` (tests), `fc3c5ef`, `581a55f` (fix), `db11226` (51-tie test), `43f3e37` +
+  `793fbb2` (improved), `570195d` (docs).
+
 ## 4. Rejected AI suggestions
 
 | Date | Decision | AI suggested | I decided | Reason |
