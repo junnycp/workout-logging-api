@@ -1,5 +1,4 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
-import Decimal from 'decimal.js';
 import { AppException } from '../common/errors/app-exception';
 import { ErrorCode, ErrorDetail } from '../common/errors/error-codes';
 import { CLOCK, Clock } from '../common/time/clock';
@@ -9,7 +8,13 @@ import { ExerciseLookupService, ExerciseRef } from '../exercises/exercise-lookup
 import { normalizeExerciseName } from '../exercises/exercise-name';
 import { weightUnits } from '../units/weight-units';
 import { roundForResponse } from '../workouts/domain/set-metrics';
-import { compareRecords, RECORD_METRICS, RecordMetric, recordValue } from './domain/record-metrics';
+import {
+  compareRecords,
+  pickRecord,
+  RECORD_METRICS,
+  RecordMetric,
+  recordValue,
+} from './domain/record-metrics';
 import {
   CompareRecordsQueryDto,
   CompareRecordsResponseDto,
@@ -31,7 +36,7 @@ export const NO_SETS_IN_EITHER_PERIOD_MESSAGE =
 const DEFAULT_UNIT = 'kg';
 const EXPLICIT_BOUNDS = ['currentFrom', 'currentTo', 'previousFrom', 'previousTo'] as const;
 
-type WinnerIds = Record<RecordMetric, string | null>;
+type CandidateIds = Record<RecordMetric, string[]>;
 type Winners = Record<RecordMetric, RecordSetRow | null>;
 
 @Injectable()
@@ -56,8 +61,8 @@ export class PersonalRecordsService {
     const unit = query.unit ?? DEFAULT_UNIT;
     const scope: RecordScope = { userId, exerciseId: exercise.id, range: range as InstantRange };
 
-    const ids = await this.winnerIds(scope);
-    const sets = await this.repository.findSets(nonNull(Object.values(ids)));
+    const ids = await this.candidateIds(scope);
+    const sets = await this.repository.findSets(Object.values(ids).flat());
     const winners = winnersOf(ids, sets);
     const empty = RECORD_METRICS.every((metric) => winners[metric] === null);
     const message =
@@ -86,13 +91,13 @@ export class PersonalRecordsService {
       range,
     });
 
-    const [currentIds, previousIds] = await Promise.all([
-      this.winnerIds(scopeOf(current)),
-      this.winnerIds(scopeOf(previous)),
+    // One period after the other: at most three pool connections per request.
+    const currentIds = await this.candidateIds(scopeOf(current));
+    const previousIds = await this.candidateIds(scopeOf(previous));
+    const sets = await this.repository.findSets([
+      ...Object.values(currentIds).flat(),
+      ...Object.values(previousIds).flat(),
     ]);
-    const sets = await this.repository.findSets(
-      nonNull([...Object.values(currentIds), ...Object.values(previousIds)]),
-    );
     const currentWinners = winnersOf(currentIds, sets);
     const previousWinners = winnersOf(previousIds, sets);
     const exact = (winners: Winners, metric: RecordMetric) => {
@@ -207,11 +212,15 @@ export class PersonalRecordsService {
     );
   }
 
-  private async winnerIds(scope: RecordScope): Promise<WinnerIds> {
-    const ids = await Promise.all(
-      RECORD_METRICS.map((metric) => this.repository.findRecordSetId(scope, metric)),
+  private async candidateIds(scope: RecordScope): Promise<CandidateIds> {
+    const [maxWeight, maxVolume, bestEstimated1RM] = await Promise.all(
+      RECORD_METRICS.map((metric) => this.repository.findRecordCandidates(scope, metric)),
     );
-    return byMetric((metric) => ids[RECORD_METRICS.indexOf(metric)] ?? null);
+    return {
+      maxWeight: maxWeight ?? [],
+      maxVolume: maxVolume ?? [],
+      bestEstimated1RM: bestEstimated1RM ?? [],
+    };
   }
 }
 
@@ -224,16 +233,18 @@ function byMetric<T>(value: (metric: RecordMetric) => T): Record<RecordMetric, T
   };
 }
 
-const nonNull = (ids: (string | null)[]): string[] => ids.filter((id): id is string => id !== null);
-
-const winnersOf = (ids: WinnerIds, sets: Map<string, RecordSetRow>): Winners =>
-  byMetric((metric) => {
-    const id = ids[metric];
-    if (id === null) return null;
-    const set = sets.get(id);
-    if (!set) throw new Error(`Record set ${id} disappeared between queries`);
-    return set;
-  });
+/** Settles each record among its candidates on exact values (D4, rule C16). */
+const winnersOf = (ids: CandidateIds, sets: Map<string, RecordSetRow>): Winners =>
+  byMetric((metric) =>
+    pickRecord(
+      metric,
+      ids[metric].map((id) => {
+        const set = sets.get(id);
+        if (!set) throw new Error(`Record set ${id} disappeared between queries`);
+        return set;
+      }),
+    ),
+  );
 
 const presentAll = (winners: Winners, unit: string) =>
   byMetric((metric) => {
@@ -250,7 +261,7 @@ function presentRecord(metric: RecordMetric, set: RecordSetRow, unit: string): P
       weight:
         unit === set.unit
           ? set.weight.toNumber()
-          : roundForResponse(weightUnits.convert(new Decimal(set.weight), set.unit, unit)),
+          : roundForResponse(weightUnits.convert(set.weight, set.unit, unit)),
     },
     achievedAt: set.performedAt.toISOString(),
     localDate: localDateOf(set.performedAt, set.utcOffsetMinutes),

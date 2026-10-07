@@ -4,12 +4,15 @@ import type { InstantRange } from '../common/time/time';
 import { PrismaService } from '../database/prisma.service';
 import type { RecordMetric } from './domain/record-metrics';
 
-/** Stored column that ranks each record (4-decimal kg; rounding is monotonic, so it can only create ties). */
+/** Stored column that ranks each record. 4-decimal kg: it can tie sets whose exact values differ. */
 const RANK_COLUMN = {
   maxWeight: 'weightKg',
   maxVolume: 'volumeKg',
   bestEstimated1RM: 'e1rmKg',
 } as const satisfies Record<RecordMetric, string>;
+
+/** Rows read per record; ties beyond this on the top stored value are fetched by a second query. */
+const RECORD_CANDIDATES = 50;
 
 export interface RecordScope {
   userId: string;
@@ -34,22 +37,29 @@ export class PersonalRecordsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Id of the set holding one record, or null. Tie-break (D4): higher value, more reps, earliest
-   * performed_at, lowest set id. Weight 0 (bodyweight) never counts. Selecting only indexed columns keeps
-   * this an Index Only Scan of `workout_sets_pr_covering_idx` (decision D10).
+   * Ids of the sets tied on the highest stored value of one metric, the only sets that can hold the record
+   * (rounding to 4 decimals is monotonic); `pickRecord` then settles them on exact values. Usually one
+   * Index Only Scan of `workout_sets_pr_covering_idx` reading the top 50 (decision D10); only when all 50
+   * tie, a second query fetches every tied set. Weight 0 (bodyweight) never counts.
    */
-  async findRecordSetId(scope: RecordScope, metric: RecordMetric): Promise<string | null> {
-    const row = await this.prisma.workoutSet.findFirst({
-      where: { ...this.where(scope), weightKg: { gt: 0 } },
-      orderBy: [
-        { [RANK_COLUMN[metric]]: 'desc' },
-        { reps: 'desc' },
-        { performedAt: 'asc' },
-        { id: 'asc' },
-      ],
+  async findRecordCandidates(scope: RecordScope, metric: RecordMetric): Promise<string[]> {
+    const column = RANK_COLUMN[metric];
+    const where = { ...this.where(scope), weightKg: { gt: 0 } };
+    const rows = await this.prisma.workoutSet.findMany({
+      where,
+      orderBy: [{ [column]: 'desc' }, { reps: 'desc' }, { performedAt: 'asc' }, { id: 'asc' }],
+      take: RECORD_CANDIDATES,
+      select: { id: true, weightKg: true, volumeKg: true, e1rmKg: true },
+    });
+    const top = rows[0]?.[column];
+    if (top === undefined) return [];
+    const tied = rows.filter((row) => row[column].equals(top));
+    if (tied.length < RECORD_CANDIDATES) return tied.map((row) => row.id);
+    const all = await this.prisma.workoutSet.findMany({
+      where: { ...where, [column]: top },
       select: { id: true },
     });
-    return row?.id ?? null;
+    return all.map((row) => row.id);
   }
 
   /** Whether the scope has bodyweight sets (weight 0), to explain why there are no records. */
@@ -61,7 +71,7 @@ export class PersonalRecordsRepository {
     return row !== null;
   }
 
-  /** Details of the winning sets (at most six per request); one query. */
+  /** Details of the candidate sets of every record in a request; one query. */
   async findSets(ids: string[]): Promise<Map<string, RecordSetRow>> {
     const rows = await this.prisma.workoutSet.findMany({
       where: { id: { in: [...new Set(ids)] } },
