@@ -24,7 +24,7 @@ describe('Database schema (integration)', () => {
           'workout_entries USING btree (user_id, exercise_id, performed_at DESC, id DESC)',
         ),
         expect.stringContaining(
-          'workout_sets USING btree (user_id, exercise_id, performed_at, weight_kg, reps, volume_kg, e1rm_kg)',
+          'workout_sets USING btree (user_id, exercise_id, performed_at, weight_kg, reps, volume_kg, e1rm_kg, id)',
         ),
         expect.stringContaining('exercise_names USING gin (name_key gin_trgm_ops)'),
         expect.stringContaining(
