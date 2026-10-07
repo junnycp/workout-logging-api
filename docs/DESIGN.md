@@ -106,7 +106,7 @@ workout_sets
   exercise_id   uuid NOT NULL
   performed_at  timestamptz NOT NULL
   UNIQUE (entry_id, set_number)
-  INDEX (user_id, exercise_id, performed_at, weight_kg, reps, volume_kg, e1rm_kg)  -- index-only PR scans;
+  INDEX (user_id, exercise_id, performed_at, weight_kg, reps, volume_kg, e1rm_kg, id)  -- index-only PR scans (D10);
         -- trailing key columns instead of INCLUDE (INCLUDE unsupported by Prisma schema, prisma#8584; same effect here)
 
 idempotency_keys
@@ -318,10 +318,17 @@ Proven by integration tests that fire parallel requests (N=20) against real Post
     query for sets (no N+1).
   - History by partial name: catalog trigram lookup → `exercise_id = ANY(ids)` on the user's index.
   - Muscle group: mapping index → exercise ids → same path.
-  - PRs: covering composite index `(user_id, exercise_id, performed_at, weight_kg, reps, volume_kg, e1rm_kg)` → index-only scan of one
-    user+exercise slice, `ORDER BY ... LIMIT 1` per metric.
+  - PRs: covering composite index `(user_id, exercise_id, performed_at, weight_kg, reps, volume_kg, e1rm_kg, id)` →
+    index-only scan of one user+exercise slice (or of the date range), `ORDER BY ... LIMIT 1` per metric (D10).
+  - M6 spike (2026-10-06, 200k sets per heavy user, random weights/reps, warm cache), ms per metric query:
+
+    | Index | 50k entries / 30 exercises, all-time | same, one month | 50k entries / 1 exercise, all-time | same, one month |
+    |-------|---:|---:|---:|---:|
+    | without `id` (M2) — Bitmap scan + heap reads | 5.9–11.0 | 0.27 | 61–84 | 1.8–2.0 |
+    | **with `id` (D10)** — Index Only Scan, 0 heap fetches | **2.6** | **0.13** | **55–63** | **1.9** |
+    | D10 + metric-leading `(user, exercise, weight_kg DESC, reps DESC, performed_at, id)` | 0.03–0.07 | 0.6–0.9 | 0.03–0.1 | 16–21 |
 - Evidence: `EXPLAIN (ANALYZE, BUFFERS)` outputs + timings in `docs/PERFORMANCE.md`; target < 50 ms DB time.
-- Known worst case: one user with 50k entries of a single exercise → PR scans ~200k index tuples (tens of ms).
+- Known worst case: one user with 50k entries of a single exercise → PR scans ~200k index tuples (≈ 60 ms per metric).
   At scale: per (user, exercise) PR summary table maintained in the write transaction, or monthly rollups.
 
 ## 9. Architecture
@@ -406,6 +413,8 @@ are separate commits and logged in AI_WORKFLOW.md.
 | D7 | Stop for review after every milestone | Approved |
 | D8 | Extras: Swagger only (no CI workflow, no extra endpoints by default) | Decided by reviewer |
 | D9 | Read-only `GET /exercises?search=` | Rejected — catalog discoverable via Swagger docs + `UNKNOWN_EXERCISE` suggestions |
+| D10 (M6-A) | PR index: covering index `(user_id, exercise_id, performed_at, weight_kg, reps, volume_kg, e1rm_kg, id)` (set `id` added as the last key column); no metric-leading indexes | Approved 2026-10-07. Reasons: (1) every column the PR query reads, including the `id` tie-break, is in the index, so it is an Index Only Scan with no heap reads, faster than before in every measured case; (2) range queries (and so every compare query) stay ≤ 2 ms because the index is ordered by date; metric-leading indexes made the planner walk metric order for ranged queries, 10× slower (16–21 ms vs 1.9 ms) on skewed data, and Prisma cannot hint indexes; (3) no extra indexes, so no extra write cost per logged set (metric indexes would add 3); (4) the slow case (≈ 60 ms per metric) needs 50k entries of ONE exercise, unrealistic; a realistic 50k-entry user takes ≈ 2.6 ms per metric. Scale path: per-(user, exercise) PR summary table for all-time records (D6), ranges stay on this index. Measurements: section 8 |
+| D11 (M6-B/C/D) | PR endpoints: unknown exercise → 400 `UNKNOWN_EXERCISE` + suggestions; a period's record is the best set within that period; compare accepts `period` or four explicit bounds | Approved 2026-10-07 |
 
 ## 13a. D1 spike results (Prisma 7.10.0 + @prisma/adapter-pg, Postgres 16, 2026-10-02)
 
