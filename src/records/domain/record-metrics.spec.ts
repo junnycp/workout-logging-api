@@ -51,6 +51,15 @@ describe('compareRecords (current period against the previous one)', () => {
     expect(compareRecords(d(100), d(100))).toEqual({ absolute: 0, percent: 0, improved: false });
   });
 
+  it('does not call a change that rounds to 0 an improvement', () => {
+    // 100 lb = 45.359237 kg against 45.359 kg: the client sees +0 kg, so it is not "improved".
+    expect(compareRecords(d('45.359237'), d('45.359'))).toEqual({
+      absolute: 0,
+      percent: 0,
+      improved: false,
+    });
+  });
+
   it('compares exact values and rounds the change to 2 decimals', () => {
     // The D3a example: 100 kg × 1 (e1RM 103.333…) against 96 kg × 2 (e1RM 102.4).
     expect(compareRecords(d(100).times(31).dividedBy(30), d('102.4'))).toEqual({
