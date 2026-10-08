@@ -154,3 +154,14 @@ export function localDateOf(instant: Date, zoneOrOffsetMinutes: string | number)
       : zoneOrOffsetMinutes;
   return DateTime.fromJSDate(instant, { zone }).toISODate() as string;
 }
+
+/**
+ * How far ahead of "now" a logged workout may be. Workouts are logged after they happen; 24 hours covers
+ * the furthest-ahead zone (UTC+14) and device clock skew while rejecting typos such as 2099 or 2062,
+ * which would otherwise become permanent all-time records (there is no edit/delete endpoint).
+ */
+export const FUTURE_TOLERANCE_MS = 24 * 60 * 60 * 1000;
+
+export function isTooFarInFuture(instant: Date, now: Date): boolean {
+  return instant.getTime() - now.getTime() > FUTURE_TOLERANCE_MS;
+}
