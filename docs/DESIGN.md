@@ -159,7 +159,8 @@ Headers: optional `Idempotency-Key`.
 }
 ```
 - `date`: ISO-8601 datetime **with offset** (`Z` or `±hh:mm`), or date-only `YYYY-MM-DD` interpreted at 00:00
-  local in the **required** `timezone` body field (IANA) (decision D2). Datetime without offset → 400.
+  local in the **required** `timezone` body field (IANA) (decision D2). Datetime without offset → 400. A date more
+  than 24 hours after the server's now → 400 `DATE_IN_FUTURE` (D12).
   Years 1900–2100. Weight has at most 3 decimals (column scale).
 - Limits: 1–100 entries, 1–50 sets per entry, reps integer 1–1000, weight 0–2000 (in given unit), body ≤ 1 MB.
 - `timezone` is a single top-level field (M4-A1), needed only when an entry uses a date-only `date`.
@@ -265,7 +266,7 @@ as history), `unit` (default `kg`). Unknown exercise → 400 `VALIDATION_ERROR`,
 ```
 | HTTP | code | When |
 |------|------|------|
-| 400 | `VALIDATION_ERROR` | Any path/header/body/query validation failure. One detail per problem: `{ path, code, message }`, e.g. `IS_DEFINED`, `IS_INT`, `IS_NUMBER`, `MIN`, `MAX`, `MAX_DECIMAL_PLACES`, `ARRAY_MIN_SIZE`, `ARRAY_MAX_SIZE`, `IS_ARRAY`, `BLANK`, `MATCHES`, `UNKNOWN_FIELD`, `UNSUPPORTED_UNIT`, `INVALID_DATE`, `MISSING_OFFSET`, `MISSING_TIMEZONE`, `INVALID_TIMEZONE`, `UNKNOWN_EXERCISE` (+ `suggestions`) |
+| 400 | `VALIDATION_ERROR` | Any path/header/body/query validation failure. One detail per problem: `{ path, code, message }`, e.g. `IS_DEFINED`, `IS_INT`, `IS_NUMBER`, `MIN`, `MAX`, `MAX_DECIMAL_PLACES`, `ARRAY_MIN_SIZE`, `ARRAY_MAX_SIZE`, `IS_ARRAY`, `BLANK`, `MATCHES`, `UNKNOWN_FIELD`, `UNSUPPORTED_UNIT`, `INVALID_DATE`, `MISSING_OFFSET`, `MISSING_TIMEZONE`, `INVALID_TIMEZONE`, `DATE_IN_FUTURE`, `UNKNOWN_EXERCISE` (+ `suggestions`) |
 | 400 | `MALFORMED_JSON` | Body is not valid JSON |
 | 400 | `BAD_REQUEST` | Other client errors raised by the HTTP layer (e.g. aborted request) |
 | 400 | `INVALID_DATE_RANGE` | `from` > `to` (M5/M6) |
@@ -444,6 +445,7 @@ are separate commits and logged in AI_WORKFLOW.md.
 | D9 | Read-only `GET /exercises?search=` | Rejected — catalog discoverable via Swagger docs + `UNKNOWN_EXERCISE` suggestions |
 | D10 (M6-A) | PR index: covering index `(user_id, exercise_id, performed_at, weight_kg, reps, volume_kg, e1rm_kg, id)` (set `id` added as the last key column); no metric-leading indexes | Approved 2026-10-07. Reasons: (1) every column the PR query reads, including the `id` tie-break, is in the index, so it is an Index Only Scan with no heap reads, faster than before in every measured case; (2) range queries (and so every compare query) stay ≤ 2 ms because the index is ordered by date; metric-leading indexes made the planner walk metric order for ranged queries, 10× slower (16–21 ms vs 1.9 ms) on skewed data, and Prisma cannot hint indexes; (3) no extra indexes, so no extra write cost per logged set (metric indexes would add 3); (4) the slow case (≈ 60 ms per metric) needs 50k entries of ONE exercise, unrealistic; a realistic 50k-entry user takes ≈ 2.6 ms per metric. Scale path: per-(user, exercise) PR summary table for all-time records (D6), ranges stay on this index. Measurements: section 8 |
 | D11 (M6-B/C/D) | PR endpoints: unknown exercise → 400 `UNKNOWN_EXERCISE` + suggestions; a period's record is the best set within that period; compare accepts `period` or four explicit bounds | Approved 2026-10-07 |
+| D12 | POST rejects a workout `date` more than 24 h after the server's now (`DATE_IN_FUTURE`). Workouts are logged after they happen; 24 h covers UTC+14 and device clock skew. Found during M6 verification: a typo year (2099) became a permanent all-time PR, and no endpoint can remove it. Alternative rejected: keep accepting future dates and cap PR queries at now (the bad row would remain in history) | Approved 2026-10-08 |
 
 ## 13a. D1 spike results (Prisma 7.10.0 + @prisma/adapter-pg, Postgres 16, 2026-10-02)
 
