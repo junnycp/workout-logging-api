@@ -1,5 +1,6 @@
 import {
   canonicalTimeZone,
+  isTooFarInFuture,
   isValidTimeZone,
   localDateOf,
   parseWorkoutDate,
@@ -203,5 +204,30 @@ describe('localDateOf', () => {
   it('accepts a fixed UTC offset in minutes (the offset stored with an entry)', () => {
     expect(localDateOf(new Date('2026-09-30T17:30:00Z'), 420)).toBe('2026-10-01');
     expect(localDateOf(new Date('2026-10-01T02:00:00Z'), -300)).toBe('2026-09-30');
+  });
+});
+
+describe('isTooFarInFuture (logged workouts happened, they are not planned)', () => {
+  const now = new Date('2026-10-08T12:00:00Z');
+  const at = (iso: string) => new Date(iso);
+
+  it.each([
+    ['the past', '2026-09-01T00:00:00Z'],
+    ['now', '2026-10-08T12:00:00Z'],
+    ['exactly 24 hours ahead', '2026-10-09T12:00:00Z'],
+  ])('accepts %s', (_case, iso) => {
+    expect(isTooFarInFuture(at(iso), now)).toBe(false);
+  });
+
+  it.each([
+    ['1 ms past the 24-hour tolerance', '2026-10-09T12:00:00.001Z'],
+    ['a typo in the year', '2099-01-01T00:00:00Z'],
+  ])('rejects %s', (_case, iso) => {
+    expect(isTooFarInFuture(at(iso), now)).toBe(true);
+  });
+
+  it('tolerates the furthest-ahead time zone: tomorrow’s date in Kiribati (UTC+14) is still today in UTC', () => {
+    // 09:00 on 9 October in Kiritimati is 19:00 on 8 October in UTC.
+    expect(isTooFarInFuture(at('2026-10-09T09:00:00+14:00'), now)).toBe(false);
   });
 });
