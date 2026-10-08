@@ -285,6 +285,17 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
 - **Commit:** `3291c0a`, `8ae7e6d` (tests), `fc3c5ef`, `581a55f` (fix), `db11226` (51-tie test), `43f3e37` +
   `793fbb2` (improved), `570195d` (docs).
 
+### C22 — Future-dated workouts accepted, so a typo could become a permanent PR (2026-10-08, M6 verification)
+- **AI output:** M3/M4 date parsing accepted any year from 1900 to 2100 and had no upper bound relative to
+  now. The M6 records endpoints, built on top of it, counted every stored set.
+- **How detected:** I asked the AI to wipe the database and verify the whole M6 script itself. All 40 scripted
+  checks passed. The AI then probed cases outside the script: POST `500 kg` dated `2099-01-01` → 201, and the
+  all-time `maxWeight` became 500 with `localDate 2099-01-01`. No endpoint can remove that row.
+- **Outcome:** I chose to reject dates more than 24 h after the server's now on POST (`DATE_IN_FUTURE`, D12)
+  rather than capping PR queries. Tests first: unit (24 h boundary, UTC+14) and e2e (year typo, date-only 48 h
+  ahead, 23 h accepted, 25 h rejected). One global `CLOCK` provider now serves POST and compare.
+- **Commit:** `5b98ad7`, `1769845` (helper), `9bedcc8` (e2e tests), `98b72f1` (POST rule), `fade932` (docs).
+
 ## 4. Rejected AI suggestions
 
 | Date | Decision | AI suggested | I decided | Reason |
@@ -294,6 +305,7 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
 | 2026-10-02 | D9 Catalog endpoint | `GET /exercises?search=` so clients can discover valid names | Rejected | Keep scope controlled; avoid over-engineering |
 | 2026-10-05 | D3 Epley at reps = 1 | Special-case reps = 1 → e1RM = weight (convention r > 1) | Apply the brief's formula literally for all reps | Respect the brief: the formula is explicitly specified |
 | 2026-10-05 | D1 Data access | Drizzle via `@nestjs/drizzle` | Prisma (verified by spike, C1) | Prior experience with Prisma; spike showed it covers the brief |
+| 2026-10-08 | M6 verification | Enable `stopAtFirstError` in the global ValidationPipe so a missing field reports one detail instead of several (`IS_DEFINED, BLANK, MAX_LENGTH, IS_STRING`) | Keep reporting every failed constraint | Reason not recorded |
 | 2026-10-05 | Pre-M5 check, finding F2 | Expose the weight-unit registry as a Nest provider (`WEIGHT_UNIT_REGISTRY`) because DESIGN listed that token and DI is graded | Keep the static registry; correct DESIGN instead | X1 is already met by one registry entry; the DTO validator cannot use DI anyway, so a token would add a second access path to the same object |
 
 ## 5. AI-generated code explained line by line
