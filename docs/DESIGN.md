@@ -106,7 +106,7 @@ workout_sets
   exercise_id   uuid NOT NULL
   performed_at  timestamptz NOT NULL
   UNIQUE (entry_id, set_number)
-  INDEX (user_id, exercise_id, performed_at, weight_kg, reps, volume_kg, e1rm_kg)  -- index-only PR scans;
+  INDEX (user_id, exercise_id, performed_at, weight_kg, reps, volume_kg, e1rm_kg, id)  -- index-only PR scans (D10);
         -- trailing key columns instead of INCLUDE (INCLUDE unsupported by Prisma schema, prisma#8584; same effect here)
 
 idempotency_keys
@@ -159,7 +159,8 @@ Headers: optional `Idempotency-Key`.
 }
 ```
 - `date`: ISO-8601 datetime **with offset** (`Z` or `±hh:mm`), or date-only `YYYY-MM-DD` interpreted at 00:00
-  local in the **required** `timezone` body field (IANA) (decision D2). Datetime without offset → 400.
+  local in the **required** `timezone` body field (IANA) (decision D2). Datetime without offset → 400. A date more
+  than 24 hours after the server's now → 400 `DATE_IN_FUTURE` (D12).
   Years 1900–2100. Weight has at most 3 decimals (column scale).
 - Limits: 1–100 entries, 1–50 sets per entry, reps integer 1–1000, weight 0–2000 (in given unit), body ≤ 1 MB.
 - `timezone` is a single top-level field (M4-A1), needed only when an entry uses a date-only `date`.
@@ -209,25 +210,48 @@ Query (all optional, combined with AND; unknown parameters → 400 `UNKNOWN_FIEL
   spike). Trade-off: a broad term (`?exercise=e`) can match most of the closed catalog (~50 ids → ~5k index rows);
   acceptable for a curated catalog, revisit if it grows to thousands.
 
-### 4.3 `GET /api/v1/users/:userId/personal-records?exercise=Bench%20Press` — PRs (R3.1–R3.4)
-Query: `exercise` (exact after normalization), optional `from`, `to`, `tz`, `unit` (default kg).
+### 4.3 `GET /api/v1/users/:userId/personal-records` — PRs (R3.1–R3.4)
+Query: `exercise` (**required**; canonical name or alias, normalized, exact), optional `from`, `to`, `tz` (same rules
+as history), `unit` (default `kg`). Unknown exercise → 400 `VALIDATION_ERROR`, detail `UNKNOWN_EXERCISE` with up to
+3 `suggestions` (D11).
 ```json
-{
-  "data": {
-    "exercise": { "id": "...", "name": "Bench Press" },
-    "range": { "from": null, "to": null, "timezone": "UTC" },
-    "maxWeight":        { "value": 110, "unit": "kg", "reps": 3, "weight": 110, "achievedAt": "...", "localDate": "2026-09-12", "entryId": "...", "setNumber": 2 },
-    "maxVolume":        { "value": 800, ... },
-    "bestEstimated1RM": { "value": 121, ... }
-  }
-}
+{ "data": {
+    "exercise": { "id": "...", "name": "Bench Press" }, "unit": "kg",
+    "range": { "from": "2026-09-01T17:00:00.000Z", "to": null, "timezone": "Asia/Ho_Chi_Minh" },
+    "maxWeight":        { "value": 100,    "set": { "reps": 1,  "weight": 100 }, "achievedAt": "2026-09-01T16:30:00.000Z",
+                          "localDate": "2026-09-01", "entryId": "...", "setNumber": 1 },
+    "maxVolume":        { "value": 800,    "set": { "reps": 10, "weight": 80 }, ... },
+    "bestEstimated1RM": { "value": 106.67, "set": { "reps": 10, "weight": 80 }, ... } },
+  "meta": {} }
 ```
-No data → 200 with `null` records and `meta.message`.
+- `range.from`/`to` are the resolved **inclusive** UTC instants (`null` = open); a date-only `to` becomes the next
+  local midnight − 1 ms. `localDate` is the date at the offset the set was logged with (as in history).
+- `value` and `set.weight` are in `unit`, recomputed from the winning set as logged and rounded once (§5); a weight in
+  its own unit is returned as logged.
+- Ranking (D4 on exact values): each record reads the top 50 sets by the stored 4-decimal column (Index Only Scan,
+  D10), keeps those tied on the highest stored value — rounding is monotonic, so the true record is among them —
+  and `pickRecord` settles them on exact values, then more reps, earliest date, lowest set id. If all 50 tie, a
+  second query fetches every tied set. (Ranking on the stored value alone picked 20.051 lb × 10 = 9.09498 kg over
+  9.095 kg × 5, both stored 9.0950 — review finding, C21.)
+- Bodyweight sets (weight 0) never win. No weighted sets → records `null` with `meta.message` "No weighted sets
+  found for this exercise in the given range." or, when only bodyweight sets exist, "Only bodyweight sets were
+  logged in the given range; weighted records need a weight above 0."
+- Queries: exercise lookup, 3 candidate queries, 1 detail query (+1 bodyweight check when empty).
 
 ### 4.4 `GET /api/v1/users/:userId/personal-records/compare` — period comparison (R3.5)
-Either `period=month|week|year` (current period-to-date vs the full previous period, in `tz`) or explicit
-`currentFrom,currentTo,previousFrom,previousTo`. Returns both PR sets plus per-metric `delta`
-(`absolute`, `percent`, `improved`). Missing side → that side `null`, delta `null`.
+`exercise`, `unit`, `tz` as above, plus **either** `period=week|month|year` **or** all four of
+`currentFrom, currentTo, previousFrom, previousTo` (neither, both, or an incomplete set → `VALIDATION_ERROR` on
+`period` / the missing bounds; an inverted range → `INVALID_DATE_RANGE`).
+- `period`: the current period up to and including now (injectable `CLOCK`; future-dated sets do not count) against
+  the whole previous period, boundaries at local midnights in `tz` (weeks start Monday). Explicit ranges are taken
+  as given, may overlap and may include future dates.
+- A period's record is the **best set within that period** (D11), ranked as in 4.3.
+- Response: `data.current` / `data.previous` = `{ from, to` (inclusive UTC instants) `, maxWeight, maxVolume,
+  bestEstimated1RM }`, `data.delta.<metric>` = `{ absolute, percent, improved }` or `null` when either side is
+  `null`. `absolute`/`percent` come from exact values rounded once; `improved` = `absolute > 0`, so it never
+  contradicts what the client sees (C21). Both periods empty → `meta.message` "No weighted sets found for this
+  exercise in either period."
+- The two periods are queried one after the other (at most 3 pool connections per request).
 
 ### 4.5 Supporting
 - `GET /health`, `GET /docs` (Swagger) — approved (D8)
@@ -242,7 +266,7 @@ Either `period=month|week|year` (current period-to-date vs the full previous per
 ```
 | HTTP | code | When |
 |------|------|------|
-| 400 | `VALIDATION_ERROR` | Any path/header/body/query validation failure. One detail per problem: `{ path, code, message }`, e.g. `IS_DEFINED`, `IS_INT`, `IS_NUMBER`, `MIN`, `MAX`, `MAX_DECIMAL_PLACES`, `ARRAY_MIN_SIZE`, `ARRAY_MAX_SIZE`, `IS_ARRAY`, `BLANK`, `MATCHES`, `UNKNOWN_FIELD`, `UNSUPPORTED_UNIT`, `INVALID_DATE`, `MISSING_OFFSET`, `MISSING_TIMEZONE`, `INVALID_TIMEZONE`, `UNKNOWN_EXERCISE` (+ `suggestions`) |
+| 400 | `VALIDATION_ERROR` | Any path/header/body/query validation failure. One detail per problem: `{ path, code, message }`, e.g. `IS_DEFINED`, `IS_INT`, `IS_NUMBER`, `MIN`, `MAX`, `MAX_DECIMAL_PLACES`, `ARRAY_MIN_SIZE`, `ARRAY_MAX_SIZE`, `IS_ARRAY`, `BLANK`, `MATCHES`, `UNKNOWN_FIELD`, `UNSUPPORTED_UNIT`, `INVALID_DATE`, `MISSING_OFFSET`, `MISSING_TIMEZONE`, `INVALID_TIMEZONE`, `DATE_IN_FUTURE`, `UNKNOWN_EXERCISE` (+ `suggestions`) |
 | 400 | `MALFORMED_JSON` | Body is not valid JSON |
 | 400 | `BAD_REQUEST` | Other client errors raised by the HTTP layer (e.g. aborted request) |
 | 400 | `INVALID_DATE_RANGE` | `from` > `to` (M5/M6) |
@@ -318,10 +342,23 @@ Proven by integration tests that fire parallel requests (N=20) against real Post
     query for sets (no N+1).
   - History by partial name: catalog trigram lookup → `exercise_id = ANY(ids)` on the user's index.
   - Muscle group: mapping index → exercise ids → same path.
-  - PRs: covering composite index `(user_id, exercise_id, performed_at, weight_kg, reps, volume_kg, e1rm_kg)` → index-only scan of one
-    user+exercise slice, `ORDER BY ... LIMIT 1` per metric.
+  - PRs: covering composite index `(user_id, exercise_id, performed_at, weight_kg, reps, volume_kg, e1rm_kg, id)` →
+    index-only scan of one user+exercise slice (or of the date range), `ORDER BY ... LIMIT 1` per metric (D10).
+  - M6 spike (2026-10-06, 200k sets per heavy user, random weights/reps, warm cache), ms per metric query:
+
+    | Index | 50k entries / 30 exercises, all-time | same, one month | 50k entries / 1 exercise, all-time | same, one month |
+    |-------|---:|---:|---:|---:|
+    | without `id` (M2) — Bitmap scan + heap reads | 5.9–11.0 | 0.27 | 61–84 | 1.8–2.0 |
+    | **with `id` (D10)** — Index Only Scan, 0 heap fetches | **2.6** | **0.13** | **55–63** | **1.9** |
+    | D10 + metric-leading `(user, exercise, weight_kg DESC, reps DESC, performed_at, id)` | 0.03–0.07 | 0.6–0.9 | 0.03–0.1 | 16–21 |
 - Evidence: `EXPLAIN (ANALYZE, BUFFERS)` outputs + timings in `docs/PERFORMANCE.md`; target < 50 ms DB time.
-- Known worst case: one user with 50k entries of a single exercise → PR scans ~200k index tuples (tens of ms).
+- Known worst case: one user with 50k entries of a single exercise → PR scans ~200k index tuples (≈ 60 ms per metric).
+- The planner over-estimates rows for `user_id = ? AND exercise_id = ?` (columns treated as independent). With a
+  realistic multi-user table it still picks the Index Only Scan (measured with auto_explain on M6: 2–4 ms per
+  metric); in a table dominated by one user it chose a sequential scan. Extended statistics on
+  `(user_id, exercise_id)` would fix the estimate; decision deferred to M7.
+- Migration `pr_index_with_set_id` rebuilds the PR index without `CONCURRENTLY` (Prisma-generated), which blocks
+  writes to `workout_sets` while it builds; fine here, a production rollout would build it concurrently first.
   At scale: per (user, exercise) PR summary table maintained in the write transaction, or monthly rollups.
 
 ## 9. Architecture
@@ -406,6 +443,9 @@ are separate commits and logged in AI_WORKFLOW.md.
 | D7 | Stop for review after every milestone | Approved |
 | D8 | Extras: Swagger only (no CI workflow, no extra endpoints by default) | Decided by reviewer |
 | D9 | Read-only `GET /exercises?search=` | Rejected — catalog discoverable via Swagger docs + `UNKNOWN_EXERCISE` suggestions |
+| D10 (M6-A) | PR index: covering index `(user_id, exercise_id, performed_at, weight_kg, reps, volume_kg, e1rm_kg, id)` (set `id` added as the last key column); no metric-leading indexes | Approved 2026-10-07. Reasons: (1) every column the PR query reads, including the `id` tie-break, is in the index, so it is an Index Only Scan with no heap reads, faster than before in every measured case; (2) range queries (and so every compare query) stay ≤ 2 ms because the index is ordered by date; metric-leading indexes made the planner walk metric order for ranged queries, 10× slower (16–21 ms vs 1.9 ms) on skewed data, and Prisma cannot hint indexes; (3) no extra indexes, so no extra write cost per logged set (metric indexes would add 3); (4) the slow case (≈ 60 ms per metric) needs 50k entries of ONE exercise, unrealistic; a realistic 50k-entry user takes ≈ 2.6 ms per metric. Scale path: per-(user, exercise) PR summary table for all-time records (D6), ranges stay on this index. Measurements: section 8 |
+| D11 (M6-B/C/D) | PR endpoints: unknown exercise → 400 `UNKNOWN_EXERCISE` + suggestions; a period's record is the best set within that period; compare accepts `period` or four explicit bounds | Approved 2026-10-07 |
+| D12 | POST rejects a workout `date` more than 24 h after the server's now (`DATE_IN_FUTURE`). Workouts are logged after they happen; 24 h covers UTC+14 and device clock skew. Found during M6 verification: a typo year (2099) became a permanent all-time PR, and no endpoint can remove it. Alternative rejected: keep accepting future dates and cap PR queries at now (the bad row would remain in history) | Approved 2026-10-08 |
 
 ## 13a. D1 spike results (Prisma 7.10.0 + @prisma/adapter-pg, Postgres 16, 2026-10-02)
 

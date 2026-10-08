@@ -249,6 +249,53 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   `@ApiHeader` the same lower-case name, so Swagger merges the two and keeps the description.
 - **Commit:** `dc2041a` (test), `7069ab0` (fix).
 
+### C20 — "Index-only PR scans" that were never index-only (2026-10-06, M6 analysis)
+- **AI output:** The approved design (DESIGN §3/§8, built in M2) described the covering index
+  `(user_id, exercise_id, performed_at, weight_kg, reps, volume_kg, e1rm_kg)` as giving "index-only PR scans".
+  The M2 review notes said the `id` tie-break would only need "a heap fetch at LIMIT 1, acceptable". The planning
+  spike in §13a had checked a PR query without the full D4 tie-break.
+- **How detected:** By the AI while analysing M6, before writing any PR code. It ran the real PR query
+  (metric, reps, earliest date, set id; `LIMIT 1`) on a 200k-set user. The plan was a Bitmap Index Scan plus a
+  heap read for every set of the user and exercise, not one heap read: 6–11 ms per metric for a realistic
+  50k-entry user, 61–84 ms in the worst case.
+- **Outcome:** Measured three options and explained them to me. I chose to add `id` as the last key column
+  (D10, reasons in DESIGN): Index Only Scan, 0 heap fetches, 2.6 ms. Rejected metric-leading indexes: they
+  made ranged queries 10× slower and cost 3 extra index writes per set. New migration; the applied one was not
+  edited.
+- **Commit:** `3c4e906` (decision), `9d44084` (test), `980f7f6` (migration).
+
+### C21 — Records ranked on rounded values, and an "improved" that contradicted the delta (2026-10-07, M6 review)
+- **AI output:** The M6 repository ordered each record by the 4-decimal stored kg, then reps, date and id (`bfced62`).
+  Its comment claimed rounding "can only create ties". The delta reported `improved` from exact values while
+  showing `absolute` rounded. 23 e2e and 12 unit tests passed.
+- **How detected:** The independent `technical-leader` review searched lb weights and found a pair:
+  20.051 lb × 10 = 9.09498 kg and 9.095 kg × 5 are both stored as 9.0950. The tie then went to more reps, so
+  the lighter set won (9.09 instead of 9.10), which breaks D4. Confirmed with a failing e2e test before
+  fixing. The same review found `{absolute: 0, improved: true}` for 100 lb against 45.359 kg, and noted that the
+  response bounds and messages differed from plan/M6.md.
+- **Outcome:**
+  - Each record now reads the top 50 stored candidates in the same Index Only Scan, keeps the sets tied on
+    the highest stored value, and settles them with a pure `pickRecord` on exact values. If all 50 tie, a
+    second query fetches every tie. Tested in unit tests and two e2e cases, one with 51 ties.
+  - `improved` = rounded `absolute > 0`.
+  - The plan's contract was replaced by the implemented one (inclusive UTC bounds), documented in DESIGN
+    4.3/4.4.
+  - Also from the review: compare queries its two periods one after the other.
+  - Deferred to M7: the planner's row estimate for correlated `user_id/exercise_id`.
+- **Commit:** `3291c0a`, `8ae7e6d` (tests), `fc3c5ef`, `581a55f` (fix), `db11226` (51-tie test), `43f3e37` +
+  `793fbb2` (improved), `570195d` (docs).
+
+### C22 — Future-dated workouts accepted, so a typo could become a permanent PR (2026-10-08, M6 verification)
+- **AI output:** M3/M4 date parsing accepted any year from 1900 to 2100 and had no upper bound relative to
+  now. The M6 records endpoints, built on top of it, counted every stored set.
+- **How detected:** I asked the AI to wipe the database and verify the whole M6 script itself. All 40 scripted
+  checks passed. The AI then probed cases outside the script: POST `500 kg` dated `2099-01-01` → 201, and the
+  all-time `maxWeight` became 500 with `localDate 2099-01-01`. No endpoint can remove that row.
+- **Outcome:** I chose to reject dates more than 24 h after the server's now on POST (`DATE_IN_FUTURE`, D12)
+  rather than capping PR queries. Tests first: unit (24 h boundary, UTC+14) and e2e (year typo, date-only 48 h
+  ahead, 23 h accepted, 25 h rejected). One global `CLOCK` provider now serves POST and compare.
+- **Commit:** `5b98ad7`, `1769845` (helper), `9bedcc8` (e2e tests), `98b72f1` (POST rule), `fade932` (docs).
+
 ## 4. Rejected AI suggestions
 
 | Date | Decision | AI suggested | I decided | Reason |
@@ -258,6 +305,7 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
 | 2026-10-02 | D9 Catalog endpoint | `GET /exercises?search=` so clients can discover valid names | Rejected | Keep scope controlled; avoid over-engineering |
 | 2026-10-05 | D3 Epley at reps = 1 | Special-case reps = 1 → e1RM = weight (convention r > 1) | Apply the brief's formula literally for all reps | Respect the brief: the formula is explicitly specified |
 | 2026-10-05 | D1 Data access | Drizzle via `@nestjs/drizzle` | Prisma (verified by spike, C1) | Prior experience with Prisma; spike showed it covers the brief |
+| 2026-10-08 | M6 verification | Enable `stopAtFirstError` in the global ValidationPipe so a missing field reports one detail instead of several (`IS_DEFINED, BLANK, MAX_LENGTH, IS_STRING`) | Keep reporting every failed constraint | Reason not recorded |
 | 2026-10-05 | Pre-M5 check, finding F2 | Expose the weight-unit registry as a Nest provider (`WEIGHT_UNIT_REGISTRY`) because DESIGN listed that token and DI is graded | Keep the static registry; correct DESIGN instead | X1 is already met by one registry entry; the DTO validator cannot use DI anyway, so a token would add a second access path to the same object |
 
 ## 5. AI-generated code explained line by line

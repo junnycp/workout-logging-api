@@ -1,14 +1,10 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { AppException } from '../common/errors/app-exception';
-import { ErrorCode, ErrorDetail } from '../common/errors/error-codes';
+import { ErrorCode } from '../common/errors/error-codes';
 import { CursorPosition, decodeCursor, encodeCursor } from '../common/pagination/cursor';
-import {
-  canonicalTimeZone,
-  InstantRange,
-  localDateOf,
-  resolveDateRange,
-} from '../common/time/time';
+import { parseRangeQuery } from '../common/time/range-query';
+import { InstantRange, localDateOf } from '../common/time/time';
 import { ExerciseDetails, ExerciseLookupService } from '../exercises/exercise-lookup.service';
 import { weightUnits } from '../units/weight-units';
 import { roundForResponse } from './domain/set-metrics';
@@ -21,11 +17,6 @@ import {
 import { HistorySetRow, WorkoutHistoryRepository } from './workout-history.repository';
 
 export const EMPTY_HISTORY_MESSAGE = 'No workouts found for the given filters.';
-
-const RANGE_MESSAGES = {
-  INVALID_DATE: 'must be YYYY-MM-DD or an ISO-8601 datetime with an offset',
-  MISSING_OFFSET: 'has a time but no UTC offset; add Z or ±hh:mm',
-} as const;
 
 @Injectable()
 export class WorkoutHistoryService {
@@ -86,51 +77,18 @@ export class WorkoutHistoryService {
     };
   }
 
-  /** Every query problem is reported in one 400, except a bad cursor or an inverted range. */
+  /** Zone and range problems are reported in one 400 (see parseRangeQuery); then the cursor. */
   private parseQuery(query: WorkoutHistoryQueryDto): {
     timezone: string;
     range: InstantRange;
     after?: CursorPosition;
   } {
-    const details: ErrorDetail[] = [];
-    const timezone = canonicalTimeZone(query.tz ?? 'UTC');
-    if (timezone === null) {
-      details.push({
-        path: 'tz',
-        code: 'INVALID_TIMEZONE',
-        message: 'tz is not a valid IANA time zone',
-      });
-    } else {
-      for (const bound of ['from', 'to'] as const) {
-        const value = query[bound];
-        if (value === undefined) continue;
-        const parsed = resolveDateRange({ [bound]: value }, timezone);
-        if (!parsed.ok && (parsed.error === 'INVALID_DATE' || parsed.error === 'MISSING_OFFSET')) {
-          details.push({
-            path: bound,
-            code: parsed.error,
-            message: `${bound} ${RANGE_MESSAGES[parsed.error]}`,
-          });
-        }
-      }
-    }
-    if (details.length > 0 || timezone === null) {
-      throw new AppException(
-        HttpStatus.BAD_REQUEST,
-        ErrorCode.VALIDATION_ERROR,
-        'Request validation failed',
-        details,
-      );
-    }
-
-    const range = resolveDateRange({ from: query.from, to: query.to }, timezone);
-    if (!range.ok) {
-      throw new AppException(
-        HttpStatus.BAD_REQUEST,
-        ErrorCode.INVALID_DATE_RANGE,
-        '`from` must not be after `to`',
-      );
-    }
+    const {
+      timezone,
+      ranges: [range],
+    } = parseRangeQuery(query.tz, [
+      { from: query.from, to: query.to, fromPath: 'from', toPath: 'to' },
+    ]);
 
     let after: CursorPosition | undefined;
     if (query.cursor !== undefined) {
@@ -143,7 +101,7 @@ export class WorkoutHistoryService {
         );
       }
     }
-    return { timezone, range: range.value, after };
+    return { timezone, range: range as InstantRange, after };
   }
 
   /**

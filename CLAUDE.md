@@ -87,6 +87,7 @@ docs/adr/        # short architecture decision records
 - Store `performed_at` as `timestamptz` (UTC) plus `utc_offset_minutes`. Input `date` is either an ISO-8601
   datetime WITH offset (`Z` or `+07:00`), or date-only `YYYY-MM-DD` together with an IANA `timezone`.
   A datetime without offset is rejected with 400 — never parse it with `new Date()` (it would use server time).
+  A `date` more than 24 h after now (injected `CLOCK`) is rejected with `DATE_IN_FUTURE` (D12): logs are retrospective.
 - Date-range filters and "this month vs last month" accept a `tz` (IANA) query param, default `UTC`.
   Compute boundaries in that tz, compare in UTC. Trade-offs go in README.
 

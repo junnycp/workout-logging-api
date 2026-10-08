@@ -1,12 +1,14 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { v7 as uuidv7 } from 'uuid';
 import { AppException } from '../common/errors/app-exception';
 import { ErrorCode, ErrorDetail } from '../common/errors/error-codes';
 import { requestHash } from '../common/idempotency/request-hash';
+import { CLOCK, Clock } from '../common/time/clock';
 import {
   canonicalTimeZone,
   DateInputError,
+  isTooFarInFuture,
   localDateOf,
   parseWorkoutDate,
 } from '../common/time/time';
@@ -33,6 +35,8 @@ const DATE_MESSAGES: Record<DateInputError, string> = {
     'date has no time; send the request-level timezone (IANA, e.g. Asia/Ho_Chi_Minh)',
   INVALID_TIMEZONE: 'timezone is not a valid IANA time zone',
 };
+const DATE_IN_FUTURE_MESSAGE =
+  'date is more than 24 hours in the future; log workouts after they happen';
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
 interface ResolvedEntry {
@@ -47,6 +51,7 @@ export class WorkoutLoggingService {
   constructor(
     private readonly repository: WorkoutsRepository,
     private readonly exercises: ExerciseLookupService,
+    @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
   /**
@@ -101,6 +106,7 @@ export class WorkoutLoggingService {
   /** Semantic validation: every problem in every entry is reported in one 400 response. */
   private async resolveEntries(dto: CreateWorkoutsDto): Promise<ResolvedEntry[]> {
     const details: ErrorDetail[] = [];
+    const now = this.clock.now();
     let timezone: string | undefined;
     let timezoneInvalid = false;
     if (dto.timezone !== undefined) {
@@ -140,6 +146,14 @@ export class WorkoutLoggingService {
           path: `entries[${index}].date`,
           code: date.error,
           message: DATE_MESSAGES[date.error],
+        });
+        return;
+      }
+      if (isTooFarInFuture(date.value.instant, now)) {
+        details.push({
+          path: `entries[${index}].date`,
+          code: 'DATE_IN_FUTURE',
+          message: DATE_IN_FUTURE_MESSAGE,
         });
         return;
       }
