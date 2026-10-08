@@ -217,6 +217,23 @@ describe('Personal records (e2e)', () => {
       expect(winner(body.data.maxWeight)).toEqual([9.1, 5, 9.095, '2026-09-02']); // value rounded, set as logged
     });
 
+    it('picks 100 kg × 1 over 96 kg × 2 as the best 1RM, as the literal Epley formula gives (D3a)', async () => {
+      // 100 × (1 + 1/30) = 103.33 beats 96 × (1 + 2/30) = 102.40; with the r > 1 convention it would lose.
+      const userId = uniqueUserId();
+      await log(userId, [
+        entry('2026-09-01T10:00:00Z', [
+          [2, 96],
+          [1, 100],
+        ]),
+      ]);
+      const body = await recordsBody(userId, { exercise: 'Bench Press' });
+      expect(body.data.bestEstimated1RM).toMatchObject({
+        value: 103.33,
+        set: { reps: 1, weight: 100 },
+        setNumber: 2,
+      });
+    });
+
     it('prefers more reps when the value ties', async () => {
       const userId = uniqueUserId();
       await log(userId, [
@@ -351,6 +368,35 @@ describe('Personal records (e2e)', () => {
       expect(body.data.previous.maxWeight?.value).toBe(100);
       expect(body.data.delta).toEqual({ maxWeight: null, maxVolume: null, bestEstimated1RM: null });
       expect(body.meta).toEqual({});
+    });
+
+    it('returns a null previous side and null deltas when only the current period has sets', async () => {
+      const newcomer = uniqueUserId();
+      await log(newcomer, [entry('2026-10-05T10:00:00Z', [[5, 100]])]);
+      const body = await compareBody(newcomer, { exercise: 'Bench Press', period: 'month' });
+      expect(body.data.current.maxWeight?.value).toBe(100);
+      expect(body.data.previous).toMatchObject({
+        maxWeight: null,
+        maxVolume: null,
+        bestEstimated1RM: null,
+      });
+      expect(body.data.delta).toEqual({ maxWeight: null, maxVolume: null, bestEstimated1RM: null });
+      expect(body.meta).toEqual({});
+    });
+
+    it('does not call an equal record an improvement', async () => {
+      const steady = uniqueUserId();
+      await log(steady, [
+        entry('2026-09-10T10:00:00Z', [[5, 100]]),
+        entry('2026-10-05T10:00:00Z', [[5, 100]]),
+      ]);
+      const body = await compareBody(steady, { exercise: 'Bench Press', period: 'month' });
+      const unchanged = { absolute: 0, percent: 0, improved: false };
+      expect(body.data.delta).toEqual({
+        maxWeight: unchanged,
+        maxVolume: unchanged,
+        bestEstimated1RM: unchanged,
+      });
     });
 
     it('adds a message when neither period has sets', async () => {
