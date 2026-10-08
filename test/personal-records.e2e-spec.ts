@@ -289,7 +289,7 @@ describe('Personal records (e2e)', () => {
         entry('2026-09-10T10:00:00Z', [[5, 95]]), // September
         entry('2026-09-30T18:00:00Z', [[1, 101]]), // 01:00 on 1 October in Hanoi, still 30 September in UTC
         entry('2026-10-05T10:00:00Z', [[3, 100]]), // October
-        entry('2026-10-20T10:00:00Z', [[1, 120]]), // after "now": not part of this month to date
+        entry('2026-10-15T15:00:00Z', [[1, 120]]), // 10 h after "now" (allowed): not in this month to date
       ]);
     });
 

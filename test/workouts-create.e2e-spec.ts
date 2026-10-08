@@ -25,6 +25,9 @@ interface CreatedBody {
   meta: { created: number };
 }
 
+/** ISO datetime (UTC) this many hours from the real clock: the POST rule compares with the server's now. */
+const hoursFromNow = (hours: number) => new Date(Date.now() + hours * 3_600_000).toISOString();
+
 const bench = (overrides: Record<string, unknown> = {}) => ({
   exerciseName: 'Bench Press',
   date: '2026-10-01T18:30:00+07:00',
@@ -122,6 +125,16 @@ describe('POST /api/v1/users/:userId/workouts (e2e)', () => {
       expect((res.body as CreatedBody).data.entries[0]?.sets[0]?.weightKg).toBe(14.51);
       const stored = await prisma.workoutSet.findFirstOrThrow({ where: { userId } });
       expect(stored.weightKg.toString()).toBe('14.515');
+    });
+
+    it('accepts a workout up to 24 hours ahead of the server clock (time zones, device skew)', async () => {
+      await post(uniqueUserId(), { entries: [bench({ date: hoursFromNow(23) })] }).expect(201);
+      const res = await post(uniqueUserId(), { entries: [bench({ date: hoursFromNow(25) })] });
+      expect(res.status).toBe(400);
+      expect(errorBodyOf(res).error.details[0]).toMatchObject({
+        path: 'entries[0].date',
+        code: 'DATE_IN_FUTURE',
+      });
     });
 
     it('accepts bodyweight sets (weight 0)', async () => {
@@ -254,6 +267,16 @@ describe('POST /api/v1/users/:userId/workouts (e2e)', () => {
         'impossible date',
         { entries: [bench({ date: '2026-02-30T10:00:00Z' })] },
         { path: 'entries[0].date', code: 'INVALID_DATE' },
+      ],
+      [
+        'a typo in the year that puts the workout in the future',
+        { entries: [bench({ date: '2099-10-01T18:30:00+07:00' })] },
+        { path: 'entries[0].date', code: 'DATE_IN_FUTURE' },
+      ],
+      [
+        'a date-only value more than 24 hours ahead',
+        { timezone: 'UTC', entries: [bench({ date: hoursFromNow(48).slice(0, 10) })] },
+        { path: 'entries[0].date', code: 'DATE_IN_FUTURE' },
       ],
       [
         'unknown timezone',
