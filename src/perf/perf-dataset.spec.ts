@@ -117,15 +117,32 @@ describe('generateUserDataset', () => {
     expect(generateUserDataset(profile, heavySpec(), exerciseIds)).toEqual(heavy);
   });
 
-  it('does not depend on which other users are generated', () => {
-    const withOptional = expandUsers(profile, { includeOptional: true });
-    const bg = withOptional.find((u) => u.id === 'perf-bg-002')!;
-    const alone = expandUsers(profile, { includeOptional: false }).find(
+  it('gives a user the same rows whatever other users the profile lists', () => {
+    const bgOnly = parsePerfProfile({ ...rawProfile, users: [rawProfile.users[1]] });
+    const fromFull = expandUsers(profile, { includeOptional: true }).find(
       (u) => u.id === 'perf-bg-002',
     )!;
-    expect(generateUserDataset(profile, bg, exerciseIds)).toEqual(
-      generateUserDataset(profile, alone, exerciseIds),
+    const fromBgOnly = expandUsers(bgOnly, { includeOptional: false }).find(
+      (u) => u.id === 'perf-bg-002',
+    )!;
+    expect(generateUserDataset(bgOnly, fromBgOnly, exerciseIds)).toEqual(
+      generateUserDataset(profile, fromFull, exerciseIds),
     );
+  });
+
+  it('gives each user different rows', () => {
+    const [, first, second] = expandUsers(profile, { includeOptional: false });
+    const a = generateUserDataset(profile, first!, exerciseIds);
+    const b = generateUserDataset(profile, second!, exerciseIds);
+    expect(a.entries.map((e) => e.performedAt)).not.toEqual(b.entries.map((e) => e.performedAt));
+    expect(a.sets.map((s) => s.weight)).not.toEqual(b.sets.map((s) => s.weight));
+  });
+
+  it('orders set ids by set number within an entry, like ids the API generates', () => {
+    const byEntry = new Map<string, string[]>();
+    for (const set of heavy.sets)
+      byEntry.set(set.entryId, [...(byEntry.get(set.entryId) ?? []), set.id]);
+    for (const ids of byEntry.values()) expect(ids).toEqual([...ids].sort());
   });
 
   it('creates the profiled number of entries with 3 to 6 numbered sets each', () => {
