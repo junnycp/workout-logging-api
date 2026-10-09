@@ -71,7 +71,10 @@ export class PersonalRecordsRepository {
     return row !== null;
   }
 
-  /** Details of the candidate sets of every record in a request; one query. */
+  /**
+   * Details of the candidate sets of every record in a request: two statements (sets, then their entries'
+   * offsets), whatever the number of candidates; Prisma splits a very long id list into chunks.
+   */
   async findSets(ids: string[]): Promise<Map<string, RecordSetRow>> {
     const rows = await this.prisma.workoutSet.findMany({
       where: { id: { in: [...new Set(ids)] } },

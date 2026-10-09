@@ -22,7 +22,10 @@ const MAX_SUGGESTIONS = 3;
 export class ExerciseLookupService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Exact lookup by normalized name or alias; one query for the whole request. */
+  /**
+   * Exact lookup by normalized name or alias for the whole request: two statements (names, then their
+   * exercises), because Prisma runs a nested relation select as a separate query.
+   */
   async resolve(nameKeys: string[]): Promise<Map<string, ExerciseRef>> {
     const rows = await this.prisma.exerciseName.findMany({
       where: { nameKey: { in: [...new Set(nameKeys)] } },
@@ -85,7 +88,7 @@ export class ExerciseLookupService {
     return rows.map((row) => row.code);
   }
 
-  /** Names and muscle groups for the exercises on one page of results; one query. */
+  /** Names and muscle groups for the exercises on one page of results; two statements (exercises, mappings). */
   async describe(ids: string[]): Promise<Map<string, ExerciseDetails>> {
     const rows = await this.prisma.exercise.findMany({
       where: { id: { in: [...new Set(ids)] } },
