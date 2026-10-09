@@ -17,7 +17,9 @@ The git log and `AI_WORKFLOW.md` are deliverables. Follow "AI adoption rules" be
   exposed through a `PrismaService` provider. Use the Prisma client by default. Only two typed raw queries
   (`$queryRaw` / TypedSQL, always parameterized): the history keyset page (Prisma's native cursor is O(depth))
   and `similarity()` name suggestions
-- Index needs Prisma can't express (e.g. `INCLUDE`) are replaced by key columns, never hand-edited migrations
+- Index needs Prisma can't express (e.g. `INCLUDE`) are replaced by key columns. SQL Prisma cannot express at all
+  (CHECK constraints, statistics) is hand-added to a new `--create-only` migration before it is applied; an applied
+  migration is never edited
 - Validation: `class-validator` + global `ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })`
 - Config: `@nestjs/config` with schema validation at boot (fail fast on missing env)
 - Logging: `nestjs-pino` (JSON logs, request id, no PII in logs)
@@ -136,6 +138,7 @@ docs/adr/        # short architecture decision records
   `AI_WORKFLOW.md` ("Corrections log") right away: date, task, what the AI produced, how it was detected,
   what was done instead, commit hash. Never invent or embellish entries — only record what actually happened.
 - Record the prompting strategy changes (new rules added here, context given, task splits) in `AI_WORKFLOW.md`.
+- Every number in a document comes from a committed artifact (file, test, commit) or is marked as command output.
 
 ## Deliverables checklist
 
