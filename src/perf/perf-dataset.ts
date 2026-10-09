@@ -1,4 +1,5 @@
 import Decimal from 'decimal.js';
+import { weightUnits } from '../units/weight-units';
 import { computeSetMetrics } from '../workouts/domain/set-metrics';
 import type { NewEntry, NewSet } from '../workouts/workouts.repository';
 import type { PerfProfile, PerfUserSpec } from './perf-profile';
@@ -14,7 +15,6 @@ export interface PerfUserDataset {
 
 const DAY_MS = 86_400_000;
 const MINUTE_MS = 60_000;
-const LB_IN_KG = 0.45359237;
 /** Share of entries logged at a UTC offset other than the user's usual one (travel). */
 const TRAVEL_SHARE = 0.1;
 
@@ -53,6 +53,12 @@ export function generateUserDataset(
     );
   }
 
+  const lookup = <V>(map: ReadonlyMap<string, V>, key: string): V => {
+    const value = map.get(key);
+    if (value === undefined) throw new Error(`No value for ${key}`);
+    return value;
+  };
+
   const rng = createPrng(seedFor(profile.seed, user.id));
   const end = Date.parse(profile.anchor);
   const start = end - profile.spanDays * DAY_MS;
@@ -71,15 +77,12 @@ export function generateUserDataset(
       const reps = rng.int(profile.reps.min, profile.reps.max);
       const progress = 0.75 + (0.35 * (ms - start)) / (end - start);
       const kg =
-        (baseKg.get(exercise) as number) *
-        progress *
-        (1.1 - 0.02 * reps) *
-        (0.95 + 0.1 * rng.next());
+        lookup(baseKg, exercise) * progress * (1.1 - 0.02 * reps) * (0.95 + 0.1 * rng.next());
       let weight = 0;
       if (!bodyweight)
         weight =
           unit === 'lb'
-            ? Math.max(5, Math.round(kg / LB_IN_KG / 5) * 5)
+            ? Math.max(5, Math.round(weightUnits.fromKg(new Decimal(kg), 'lb').toNumber() / 5) * 5)
             : Math.max(2.5, Math.round(kg / 2.5) * 2.5);
       return { reps, weight: String(weight), unit };
     });
@@ -92,15 +95,14 @@ export function generateUserDataset(
   };
 
   // Skewed (Zipf-like) exercise frequency: the i-th exercise is picked with weight 1 / (i + 1).
-  const weights = user.exercises.map((_, i) => 1 / (i + 1));
-  const total = weights.reduce((a, b) => a + b, 0);
+  const total = user.exercises.reduce((sum, _, i) => sum + 1 / (i + 1), 0);
   const pickExercise = (): string => {
     let x = rng.next() * total;
-    for (let i = 0; i < weights.length; i++) {
-      x -= weights[i] as number;
-      if (x < 0) return user.exercises[i] as string;
+    for (const [i, exercise] of user.exercises.entries()) {
+      x -= 1 / (i + 1);
+      if (x < 0) return exercise;
     }
-    return user.exercises[user.exercises.length - 1] as string;
+    return rng.pick(user.exercises); // only reachable through float rounding at the very end
   };
 
   const scenarioEntries = [oldOnly, bodyweightOnly, plateau, sameInstant].reduce(
@@ -147,38 +149,38 @@ export function generateUserDataset(
       drafts.push(regularEntry(sameInstant.exercise, ms, usualOffset));
   }
 
+  const identified = drafts.map((draft) => ({ id: prngUuidV7(draft.ms, rng), draft }));
+  identified.sort((a, b) => a.draft.ms - b.draft.ms || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+
   const entries: NewEntry[] = [];
-  const setsByEntry = new Map<string, SetDraft[]>();
-  for (const draft of drafts) {
-    const id = prngUuidV7(draft.ms, rng);
+  const sets: NewSet[] = [];
+  for (const { id, draft } of identified) {
+    const performedAt = new Date(draft.ms);
+    const exerciseId = lookup(exerciseIds, draft.exercise);
     entries.push({
       id,
       userId: user.id,
-      exerciseId: exerciseIds.get(draft.exercise) as string,
-      performedAt: new Date(draft.ms),
+      exerciseId,
+      performedAt,
       utcOffsetMinutes: draft.utcOffsetMinutes,
     });
-    setsByEntry.set(id, draft.sets);
+    // Ascending ids in set order, as uuidv7() gives the API's sets (the lowest-id tie-break relies on it).
+    const setIds = draft.sets.map(() => prngUuidV7(draft.ms, rng)).sort();
+    draft.sets.forEach((set, i) => {
+      sets.push({
+        id: setIds[i] ?? '',
+        entryId: id,
+        setNumber: i + 1,
+        reps: set.reps,
+        weight: set.weight,
+        unit: set.unit,
+        ...computeSetMetrics({ reps: set.reps, weight: new Decimal(set.weight), unit: set.unit }),
+        userId: user.id,
+        exerciseId,
+        performedAt,
+      });
+    });
   }
-  entries.sort(
-    (a, b) =>
-      a.performedAt.getTime() - b.performedAt.getTime() || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-  );
-
-  const sets: NewSet[] = entries.flatMap((entry) =>
-    (setsByEntry.get(entry.id) as SetDraft[]).map((set, i) => ({
-      id: prngUuidV7(entry.performedAt.getTime(), rng),
-      entryId: entry.id,
-      setNumber: i + 1,
-      reps: set.reps,
-      weight: set.weight,
-      unit: set.unit,
-      ...computeSetMetrics({ reps: set.reps, weight: new Decimal(set.weight), unit: set.unit }),
-      userId: user.id,
-      exerciseId: entry.exerciseId,
-      performedAt: entry.performedAt,
-    })),
-  );
 
   return { userId: user.id, entries, sets };
 }
