@@ -336,14 +336,17 @@ Proven by integration tests that fire parallel requests (N=20) against real Post
 
 ## 8. Performance (E6)
 
-- Seed: 1 heavy user with 50,000 entries (~200,000 sets, 30 exercises, 3 years) + 50 background users.
-- Queries and the index each relies on:
-  - History page: `(user_id, performed_at DESC, id DESC)` → `LIMIT 21` index scan, then one `entry_id = ANY(...)`
-    query for sets (no N+1).
-  - History by partial name: catalog trigram lookup → `exercise_id = ANY(ids)` on the user's index.
-  - Muscle group: mapping index → exercise ids → same path.
+- Dataset (M7): `prisma/seed/perf-profile.json`, generated deterministically by `npm run seed:perf`: `perf-heavy`
+  (50k entries / 225k sets, 30 exercises with skewed frequency, plus an old-only, a bodyweight-only, a plateau and a
+  same-instant scenario) and 50 background users × 2k entries (150k entries / 675k sets); optionally `perf-single`
+  (50k entries of one exercise), measured on its own.
+- Queries and the index each relies on (statement counts and plans: `docs/perf/plans/`):
+  - History page: `(user_id, performed_at DESC, id DESC)` → `LIMIT limit+1` index scan with a row-comparison cursor,
+    then one `entry_id IN (...)` query for sets (no N+1).
+  - History by partial name or muscle group: catalog lookup → exercise ids → a `LATERAL` index scan per id on
+    `(user_id, exercise_id, performed_at DESC, id DESC)` (M5-A).
   - PRs: covering composite index `(user_id, exercise_id, performed_at, weight_kg, reps, volume_kg, e1rm_kg, id)` →
-    index-only scan of one user+exercise slice (or of the date range), `ORDER BY ... LIMIT 1` per metric (D10).
+    index-only scan of one user+exercise slice (or of the date range), top 50 candidates per metric (D10, C21).
   - M6 spike (2026-10-06, 200k sets per heavy user, random weights/reps, warm cache), ms per metric query:
 
     | Index | 50k entries / 30 exercises, all-time | same, one month | 50k entries / 1 exercise, all-time | same, one month |
@@ -351,12 +354,23 @@ Proven by integration tests that fire parallel requests (N=20) against real Post
     | without `id` (M2) — Bitmap scan + heap reads | 5.9–11.0 | 0.27 | 61–84 | 1.8–2.0 |
     | **with `id` (D10)** — Index Only Scan, 0 heap fetches | **2.6** | **0.13** | **55–63** | **1.9** |
     | D10 + metric-leading `(user, exercise, weight_kg DESC, reps DESC, performed_at, id)` | 0.03–0.07 | 0.6–0.9 | 0.03–0.1 | 16–21 |
-- Evidence: `EXPLAIN (ANALYZE, BUFFERS)` outputs + timings in `docs/PERFORMANCE.md`; target < 50 ms DB time.
-- Known worst case: one user with 50k entries of a single exercise → PR scans ~200k index tuples (≈ 60 ms per metric).
-- The planner over-estimates rows for `user_id = ? AND exercise_id = ?` (columns treated as independent). With a
-  realistic multi-user table it still picks the Index Only Scan (measured with auto_explain on M6: 2–4 ms per
-  metric); in a table dominated by one user it chose a sequential scan. Extended statistics on
-  `(user_id, exercise_id)` would fix the estimate; decision deferred to M7.
+- Evidence (M7, fresh volume): `docs/PERFORMANCE.md`, raw output in `docs/perf/`. Endpoint p95 (warm, sequential):
+  history ≤ 6.1 ms at any cursor depth, PRs ≤ 31.0 ms (most-logged exercise, 53k weighted sets), compare 7.8 ms,
+  POST one entry 4.4 ms, 5,000-set bulk 328 ms. DB target (< 50 ms per read statement) met warm; missed cold by one
+  statement: the most-logged exercise's PR scan, 188 ms with empty shared_buffers (one noisy sample; 61 ms in an
+  earlier run).
+- Known worst case: one user with 50k entries of a single exercise (`perf-single`, 213k weighted sets) → PRs p95
+  89.9 ms (three index-only scans of the whole slice). Accepted by D10; scale path below.
+- Tie overflow (M7-T5): when all 50 candidates tie on the top stored value, the follow-up query fetches every tied
+  set without a LIMIT. 174 plateau ties: p95 7.6 ms; 66,668 identical sets: 73 ms + 412 ms (plan-review spike).
+  Documented as a limit, not bounded; the bound would be `ORDER BY reps DESC, performed_at, id LIMIT n` on the
+  tied value.
+- Planner estimates (deferred from M6, decided in M7 as D13): the `user_id = ? AND exercise_id = ?` estimates are
+  within 1.3× on the main dataset, except the 174-set plateau exercise (2.7×, still an Index Only Scan); every ≥ 10× ratio is a LIMIT stopping early, an exercise without weighted sets,
+  or the tie equality, and all keep the intended Index (Only) Scan. No extended statistics.
+- Concurrency: the pg pool is not configured (default 10 connections) and a PR request runs 3 queries in parallel;
+  closed-loop batches of 20 PR requests → p95 105.1 ms (queueing, no errors). Scale path: configurable pool,
+  PgBouncer, replicas.
 - Migration `pr_index_with_set_id` rebuilds the PR index without `CONCURRENTLY` (Prisma-generated), which blocks
   writes to `workout_sets` while it builds; fine here, a production rollout would build it concurrently first.
   At scale: per (user, exercise) PR summary table maintained in the write transaction, or monthly rollups.
@@ -395,7 +409,8 @@ Integration (Testcontainers Postgres, real migrations, Supertest):
 - PRs: fixture with known answers incl. ties and mixed units; range filter; compare month vs month incl.
   empty previous period.
 
-Perf: `npm run seed:perf` + `npm run perf:explain` (script, not part of the test suite).
+Perf: `npm run seed:perf`, `npm run perf:plans` (auto_explain plans), `npm run perf:latency` (endpoint latency
+against a running API); scripts, not part of the test suite (timings are machine-dependent). `docs/PERFORMANCE.md`.
 
 ## 11. Milestones & commits (stop for review after each)
 
@@ -407,7 +422,7 @@ Perf: `npm run seed:perf` + `npm run perf:explain` (script, not part of the test
 | M4 | POST bulk + idempotency + concurrency tests | 4–5 | `feat(workouts): bulk logging`, `feat(workouts): idempotency key` |
 | M5 | GET history + filters + keyset pagination (typed raw query) + unit output | 4.5–5.5 | `feat(workouts): history with keyset pagination` |
 | M6 | PRs + compare | 4–5 | `feat(records): personal records`, `feat(records): period comparison` |
-| M7 | Perf seed, EXPLAIN evidence, index tuning | 1.5–2 | `perf: seed 50k entries and document query plans` |
+| M7 | Perf seed, EXPLAIN evidence, index tuning (re-estimated 4–4.75, see ESTIMATION) | 1.5–2 | `feat(perf): seed:perf CLI`, `docs(perf): query plans and timings ...` |
 | M8 | README (diagram, API, schema, trade-offs, 10k coaches), AI_WORKFLOW.md, review & refactor | 4–5 | `docs: ...` |
 | — | Cross-milestone edge-case and integration test hardening | 4–5 | `test: ...` |
 | — | Review, refactoring, buffer | 2–3 | `refactor: ...` |
@@ -446,6 +461,7 @@ are separate commits and logged in AI_WORKFLOW.md.
 | D10 (M6-A) | PR index: covering index `(user_id, exercise_id, performed_at, weight_kg, reps, volume_kg, e1rm_kg, id)` (set `id` added as the last key column); no metric-leading indexes | Approved 2026-10-07. Reasons: (1) every column the PR query reads, including the `id` tie-break, is in the index, so it is an Index Only Scan with no heap reads, faster than before in every measured case; (2) range queries (and so every compare query) stay ≤ 2 ms because the index is ordered by date; metric-leading indexes made the planner walk metric order for ranged queries, 10× slower (16–21 ms vs 1.9 ms) on skewed data, and Prisma cannot hint indexes; (3) no extra indexes, so no extra write cost per logged set (metric indexes would add 3); (4) the slow case (≈ 60 ms per metric) needs 50k entries of ONE exercise, unrealistic; a realistic 50k-entry user takes ≈ 2.6 ms per metric. Scale path: per-(user, exercise) PR summary table for all-time records (D6), ranges stay on this index. Measurements: section 8 |
 | D11 (M6-B/C/D) | PR endpoints: unknown exercise → 400 `UNKNOWN_EXERCISE` + suggestions; a period's record is the best set within that period; compare accepts `period` or four explicit bounds | Approved 2026-10-07 |
 | D12 | POST rejects a workout `date` more than 24 h after the server's now (`DATE_IN_FUTURE`). Workouts are logged after they happen; 24 h covers UTC+14 and device clock skew. Found during M6 verification: a typo year (2099) became a permanent all-time PR, and no endpoint can remove it. Alternative rejected: keep accepting future dates and cap PR queries at now (the bad row would remain in history) | Approved 2026-10-08 |
+| D13 (M7-C) | No extended statistics on `(user_id, exercise_id)`. Rule set before measuring: add them only if a row estimate is off by ≥ 10× **and** that makes the plan worse. Measured on the M7 main dataset (`docs/perf/plans/`): the user + exercise estimates are within 1.3× except the 174-set plateau (65 vs 174, 2.7×); the ≥ 10× ratios are LIMIT early stops (history, bodyweight check), an exercise with no weighted sets (905 vs 0) and the tie equality (1 vs 174), all still Index (Only) Scans on the intended index. Had they been needed: a `--create-only` migration with hand-added SQL, as for the CHECK constraints (Prisma's diff ignores statistics objects) | Decided 2026-10-09 by the approved M7 rule |
 
 ## 13a. D1 spike results (Prisma 7.10.0 + @prisma/adapter-pg, Postgres 16, 2026-10-02)
 

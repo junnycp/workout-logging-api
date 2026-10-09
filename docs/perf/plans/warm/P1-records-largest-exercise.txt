@@ -1,0 +1,104 @@
+# PRs, all-time, most-logged exercise (Bench Press)
+GET /api/v1/users/perf-heavy/personal-records?exercise=Bench+Press
+7 statements
+
+## Statement 1: 0.011 ms
+Query: SELECT "public"."exercise_names"."name_key", "public"."exercise_names"."exercise_id" FROM "public"."exercise_names" WHERE "public"."exercise_names"."name_key" IN ($1) OFFSET $2
+Parameters: $1 = 'bench press', $2 = '0'
+
+Seq Scan on exercise_names  (cost=0.00..4.84 rows=1 width=30) (actual time=0.004..0.010 rows=1 loops=1)
+  Filter: ((name_key)::text = 'bench press'::text)
+  Rows Removed by Filter: 146
+  Buffers: shared hit=3
+
+## Statement 2: 0.006 ms
+Query: SELECT "public"."exercises"."id", "public"."exercises"."name" FROM "public"."exercises" WHERE "public"."exercises"."id" IN ($1) OFFSET $2
+Parameters: $1 = '01a11ee7-5773-770b-924d-8749aae32d11', $2 = '0'
+
+Seq Scan on exercises  (cost=0.00..1.71 rows=1 width=30) (actual time=0.003..0.005 rows=1 loops=1)
+  Filter: (id = '01a11ee7-5773-770b-924d-8749aae32d11'::uuid)
+  Rows Removed by Filter: 56
+  Buffers: shared hit=1
+
+## Statement 3: 30.253 ms
+Query: SELECT "public"."workout_sets"."id", "public"."workout_sets"."weight_kg", "public"."workout_sets"."volume_kg", "public"."workout_sets"."e1rm_kg" FROM "public"."workout_sets" WHERE ("public"."workout_sets"."user_id" = $1 AND "public"."workout_sets"."exercise_id" = $2 AND "public"."workout_sets"."weight_kg" > $3) ORDER BY "public"."workout_sets"."weight_kg" DESC, "public"."workout_sets"."reps" DESC, "public"."workout_sets"."performed_at" ASC, "public"."workout_sets"."id" ASC LIMIT $4 OFFSET $5
+Parameters: $1 = 'perf-heavy', $2 = '01a11ee7-5773-770b-924d-8749aae32d11', $3 = '0', $4 = '50', $5 = '0'
+
+Limit  (cost=8076.67..8082.51 rows=50 width=44) (actual time=29.578..30.235 rows=50 loops=1)
+  Buffers: shared hit=1364
+  ->  Gather Merge  (cost=8076.67..13292.50 rows=44704 width=44) (actual time=29.578..30.232 rows=50 loops=1)
+        Workers Planned: 2
+        Workers Launched: 2
+        Buffers: shared hit=1364
+        ->  Sort  (cost=7076.65..7132.53 rows=22352 width=44) (actual time=21.208..21.210 rows=48 loops=3)
+              Sort Key: weight_kg DESC, reps DESC, performed_at, id
+              Sort Method: top-N heapsort  Memory: 34kB
+              Buffers: shared hit=1364
+              Worker 0:  Sort Method: top-N heapsort  Memory: 33kB
+              Worker 1:  Sort Method: top-N heapsort  Memory: 34kB
+              ->  Parallel Index Only Scan using workout_sets_pr_covering_idx on workout_sets  (cost=0.42..6334.13 rows=22352 width=44) (actual time=0.019..11.439 rows=17712 loops=3)
+                    Index Cond: ((user_id = 'perf-heavy'::text) AND (exercise_id = '01a11ee7-5773-770b-924d-8749aae32d11'::uuid) AND (weight_kg > '0'::numeric))
+                    Heap Fetches: 0
+                    Buffers: shared hit=1306
+
+## Statement 4: 30.349 ms
+Query: SELECT "public"."workout_sets"."id", "public"."workout_sets"."weight_kg", "public"."workout_sets"."volume_kg", "public"."workout_sets"."e1rm_kg" FROM "public"."workout_sets" WHERE ("public"."workout_sets"."user_id" = $1 AND "public"."workout_sets"."exercise_id" = $2 AND "public"."workout_sets"."weight_kg" > $3) ORDER BY "public"."workout_sets"."volume_kg" DESC, "public"."workout_sets"."reps" DESC, "public"."workout_sets"."performed_at" ASC, "public"."workout_sets"."id" ASC LIMIT $4 OFFSET $5
+Parameters: $1 = 'perf-heavy', $2 = '01a11ee7-5773-770b-924d-8749aae32d11', $3 = '0', $4 = '50', $5 = '0'
+
+Limit  (cost=8076.67..8082.51 rows=50 width=44) (actual time=29.505..30.331 rows=50 loops=1)
+  Buffers: shared hit=1364
+  ->  Gather Merge  (cost=8076.67..13292.50 rows=44704 width=44) (actual time=29.504..30.327 rows=50 loops=1)
+        Workers Planned: 2
+        Workers Launched: 2
+        Buffers: shared hit=1364
+        ->  Sort  (cost=7076.65..7132.53 rows=22352 width=44) (actual time=21.572..21.574 rows=41 loops=3)
+              Sort Key: volume_kg DESC, reps DESC, performed_at, id
+              Sort Method: top-N heapsort  Memory: 32kB
+              Buffers: shared hit=1364
+              Worker 0:  Sort Method: top-N heapsort  Memory: 32kB
+              Worker 1:  Sort Method: top-N heapsort  Memory: 32kB
+              ->  Parallel Index Only Scan using workout_sets_pr_covering_idx on workout_sets  (cost=0.42..6334.13 rows=22352 width=44) (actual time=0.018..10.268 rows=17712 loops=3)
+                    Index Cond: ((user_id = 'perf-heavy'::text) AND (exercise_id = '01a11ee7-5773-770b-924d-8749aae32d11'::uuid) AND (weight_kg > '0'::numeric))
+                    Heap Fetches: 0
+                    Buffers: shared hit=1306
+
+## Statement 5: 21.597 ms
+Query: SELECT "public"."workout_sets"."id", "public"."workout_sets"."weight_kg", "public"."workout_sets"."volume_kg", "public"."workout_sets"."e1rm_kg" FROM "public"."workout_sets" WHERE ("public"."workout_sets"."user_id" = $1 AND "public"."workout_sets"."exercise_id" = $2 AND "public"."workout_sets"."weight_kg" > $3) ORDER BY "public"."workout_sets"."e1rm_kg" DESC, "public"."workout_sets"."reps" DESC, "public"."workout_sets"."performed_at" ASC, "public"."workout_sets"."id" ASC LIMIT $4 OFFSET $5
+Parameters: $1 = 'perf-heavy', $2 = '01a11ee7-5773-770b-924d-8749aae32d11', $3 = '0', $4 = '50', $5 = '0'
+
+Limit  (cost=8076.67..8082.51 rows=50 width=44) (actual time=21.405..21.569 rows=50 loops=1)
+  Buffers: shared hit=1365
+  ->  Gather Merge  (cost=8076.67..13292.50 rows=44704 width=44) (actual time=21.404..21.563 rows=50 loops=1)
+        Workers Planned: 2
+        Workers Launched: 2
+        Buffers: shared hit=1365
+        ->  Sort  (cost=7076.65..7132.53 rows=22352 width=44) (actual time=13.490..13.492 rows=39 loops=3)
+              Sort Key: e1rm_kg DESC, reps DESC, performed_at, id
+              Sort Method: top-N heapsort  Memory: 33kB
+              Buffers: shared hit=1365
+              Worker 0:  Sort Method: top-N heapsort  Memory: 32kB
+              Worker 1:  Sort Method: top-N heapsort  Memory: 32kB
+              ->  Parallel Index Only Scan using workout_sets_pr_covering_idx on workout_sets  (cost=0.42..6334.13 rows=22352 width=44) (actual time=1.359..8.534 rows=17712 loops=3)
+                    Index Cond: ((user_id = 'perf-heavy'::text) AND (exercise_id = '01a11ee7-5773-770b-924d-8749aae32d11'::uuid) AND (weight_kg > '0'::numeric))
+                    Heap Fetches: 0
+                    Buffers: shared hit=1307
+
+## Statement 6: 0.042 ms
+Query: SELECT "public"."workout_sets"."id", "public"."workout_sets"."entry_id", "public"."workout_sets"."set_number", "public"."workout_sets"."reps", "public"."workout_sets"."weight", "public"."workout_sets"."unit", "public"."workout_sets"."performed_at" FROM "public"."workout_sets" WHERE "public"."workout_sets"."id" IN ($1,$2,$3,$4,$5,$6) OFFSET $7
+Parameters: $1 = '01a0e9fc-4820-7914-9199-deccb9e4ecfc', $2 = '01a014ea-1400-78ad-8e7e-341325841435', $3 = '01a04512-91c0-7cca-b6a3-3adc2ac42fc7', $4 = '01a0b41a-f260-7c82-965a-d427c32f7222', $5 = '01a0d574-3d40-72e7-8912-fd8498645998', $6 = '01a0cd87-6e40-75f4-9176-8184e663b719', $7 = '0'
+
+Index Scan using workout_sets_pkey on workout_sets  (cost=0.42..50.36 rows=6 width=54) (actual time=0.021..0.035 rows=6 loops=1)
+  Index Cond: (id = ANY ('{01a0e9fc-4820-7914-9199-deccb9e4ecfc,01a014ea-1400-78ad-8e7e-341325841435,01a04512-91c0-7cca-b6a3-3adc2ac42fc7,01a0b41a-f260-7c82-965a-d427c32f7222,01a0d574-3d40-72e7-8912-fd8498645998,01a0cd87-6e40-75f4-9176-8184e663b719}'::uuid[]))
+  Buffers: shared hit=27
+
+## Statement 7: 0.038 ms
+Query: SELECT "public"."workout_entries"."id", "public"."workout_entries"."utc_offset_minutes" FROM "public"."workout_entries" WHERE "public"."workout_entries"."id" IN ($1,$2,$3,$4,$5,$6) OFFSET $7
+Parameters: $1 = '01a014ea-1400-7937-8ca6-c9ba5e5ef779', $2 = '01a04512-91c0-7b11-b675-4f04e30a069f', $3 = '01a0b41a-f260-7e36-ac6b-2e2aaff97ebc', $4 = '01a0cd87-6e40-7730-a741-76e0718204ae', $5 = '01a0d574-3d40-7698-9f6a-0fcf395464a9', $6 = '01a0e9fc-4820-7dc7-8efc-ac7edabb5f4a', $7 = '0'
+
+Bitmap Heap Scan on workout_entries  (cost=26.57..49.65 rows=6 width=18) (actual time=0.027..0.036 rows=6 loops=1)
+  Recheck Cond: (id = ANY ('{01a014ea-1400-7937-8ca6-c9ba5e5ef779,01a04512-91c0-7b11-b675-4f04e30a069f,01a0b41a-f260-7e36-ac6b-2e2aaff97ebc,01a0cd87-6e40-7730-a741-76e0718204ae,01a0d574-3d40-7698-9f6a-0fcf395464a9,01a0e9fc-4820-7dc7-8efc-ac7edabb5f4a}'::uuid[]))
+  Heap Blocks: exact=6
+  Buffers: shared hit=24
+  ->  Bitmap Index Scan on workout_entries_pkey  (cost=0.00..26.57 rows=6 width=0) (actual time=0.020..0.020 rows=6 loops=1)
+        Index Cond: (id = ANY ('{01a014ea-1400-7937-8ca6-c9ba5e5ef779,01a04512-91c0-7b11-b675-4f04e30a069f,01a0b41a-f260-7e36-ac6b-2e2aaff97ebc,01a0cd87-6e40-7730-a741-76e0718204ae,01a0d574-3d40-7698-9f6a-0fcf395464a9,01a0e9fc-4820-7dc7-8efc-ac7edabb5f4a}'::uuid[]))
+        Buffers: shared hit=18

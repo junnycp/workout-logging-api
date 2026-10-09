@@ -1,0 +1,91 @@
+# PRs, bodyweight-only exercise (Pull-Up)
+GET /api/v1/users/perf-heavy/personal-records?exercise=Pull-Up
+8 statements
+
+## Statement 1: 0.011 ms
+Query: SELECT "public"."exercise_names"."name_key", "public"."exercise_names"."exercise_id" FROM "public"."exercise_names" WHERE "public"."exercise_names"."name_key" IN ($1) OFFSET $2
+Parameters: $1 = 'pull-up', $2 = '0'
+
+Seq Scan on exercise_names  (cost=0.00..4.84 rows=1 width=30) (actual time=0.006..0.010 rows=1 loops=1)
+  Filter: ((name_key)::text = 'pull-up'::text)
+  Rows Removed by Filter: 146
+  Buffers: shared hit=3
+
+## Statement 2: 0.006 ms
+Query: SELECT "public"."exercises"."id", "public"."exercises"."name" FROM "public"."exercises" WHERE "public"."exercises"."id" IN ($1) OFFSET $2
+Parameters: $1 = '01a11ee7-5779-72bd-87b3-3275aaa73766', $2 = '0'
+
+Seq Scan on exercises  (cost=0.00..1.71 rows=1 width=30) (actual time=0.004..0.005 rows=1 loops=1)
+  Filter: (id = '01a11ee7-5779-72bd-87b3-3275aaa73766'::uuid)
+  Rows Removed by Filter: 56
+  Buffers: shared hit=1
+
+## Statement 3: 5.29 ms
+Query: SELECT "public"."workout_sets"."id", "public"."workout_sets"."weight_kg", "public"."workout_sets"."volume_kg", "public"."workout_sets"."e1rm_kg" FROM "public"."workout_sets" WHERE ("public"."workout_sets"."user_id" = $1 AND "public"."workout_sets"."exercise_id" = $2 AND "public"."workout_sets"."weight_kg" > $3) ORDER BY "public"."workout_sets"."e1rm_kg" DESC, "public"."workout_sets"."reps" DESC, "public"."workout_sets"."performed_at" ASC, "public"."workout_sets"."id" ASC LIMIT $4 OFFSET $5
+Parameters: $1 = 'perf-heavy', $2 = '01a11ee7-5779-72bd-87b3-3275aaa73766', $3 = '0', $4 = '50', $5 = '0'
+
+Limit  (cost=139.07..139.20 rows=50 width=44) (actual time=5.289..5.290 rows=0 loops=1)
+  Buffers: shared hit=58
+  ->  Sort  (cost=139.07..141.32 rows=898 width=44) (actual time=5.289..5.289 rows=0 loops=1)
+        Sort Key: e1rm_kg DESC, reps DESC, performed_at, id
+        Sort Method: quicksort  Memory: 25kB
+        Buffers: shared hit=58
+        ->  Index Only Scan using workout_sets_pr_covering_idx on workout_sets  (cost=0.42..109.24 rows=898 width=44) (actual time=5.286..5.286 rows=0 loops=1)
+              Index Cond: ((user_id = 'perf-heavy'::text) AND (exercise_id = '01a11ee7-5779-72bd-87b3-3275aaa73766'::uuid) AND (weight_kg > '0'::numeric))
+              Heap Fetches: 0
+              Buffers: shared hit=58
+
+## Statement 4: 5.497 ms
+Query: SELECT "public"."workout_sets"."id", "public"."workout_sets"."weight_kg", "public"."workout_sets"."volume_kg", "public"."workout_sets"."e1rm_kg" FROM "public"."workout_sets" WHERE ("public"."workout_sets"."user_id" = $1 AND "public"."workout_sets"."exercise_id" = $2 AND "public"."workout_sets"."weight_kg" > $3) ORDER BY "public"."workout_sets"."volume_kg" DESC, "public"."workout_sets"."reps" DESC, "public"."workout_sets"."performed_at" ASC, "public"."workout_sets"."id" ASC LIMIT $4 OFFSET $5
+Parameters: $1 = 'perf-heavy', $2 = '01a11ee7-5779-72bd-87b3-3275aaa73766', $3 = '0', $4 = '50', $5 = '0'
+
+Limit  (cost=139.07..139.20 rows=50 width=44) (actual time=5.496..5.496 rows=0 loops=1)
+  Buffers: shared hit=1 read=57
+  ->  Sort  (cost=139.07..141.32 rows=898 width=44) (actual time=5.495..5.495 rows=0 loops=1)
+        Sort Key: volume_kg DESC, reps DESC, performed_at, id
+        Sort Method: quicksort  Memory: 25kB
+        Buffers: shared hit=1 read=57
+        ->  Index Only Scan using workout_sets_pr_covering_idx on workout_sets  (cost=0.42..109.24 rows=898 width=44) (actual time=5.490..5.490 rows=0 loops=1)
+              Index Cond: ((user_id = 'perf-heavy'::text) AND (exercise_id = '01a11ee7-5779-72bd-87b3-3275aaa73766'::uuid) AND (weight_kg > '0'::numeric))
+              Heap Fetches: 0
+              Buffers: shared hit=1 read=57
+
+## Statement 5: 5.506 ms
+Query: SELECT "public"."workout_sets"."id", "public"."workout_sets"."weight_kg", "public"."workout_sets"."volume_kg", "public"."workout_sets"."e1rm_kg" FROM "public"."workout_sets" WHERE ("public"."workout_sets"."user_id" = $1 AND "public"."workout_sets"."exercise_id" = $2 AND "public"."workout_sets"."weight_kg" > $3) ORDER BY "public"."workout_sets"."weight_kg" DESC, "public"."workout_sets"."reps" DESC, "public"."workout_sets"."performed_at" ASC, "public"."workout_sets"."id" ASC LIMIT $4 OFFSET $5
+Parameters: $1 = 'perf-heavy', $2 = '01a11ee7-5779-72bd-87b3-3275aaa73766', $3 = '0', $4 = '50', $5 = '0'
+
+Limit  (cost=139.07..139.20 rows=50 width=44) (actual time=5.505..5.506 rows=0 loops=1)
+  Buffers: shared hit=58
+  ->  Sort  (cost=139.07..141.32 rows=898 width=44) (actual time=5.505..5.505 rows=0 loops=1)
+        Sort Key: weight_kg DESC, reps DESC, performed_at, id
+        Sort Method: quicksort  Memory: 25kB
+        Buffers: shared hit=58
+        ->  Index Only Scan using workout_sets_pr_covering_idx on workout_sets  (cost=0.42..109.24 rows=898 width=44) (actual time=5.500..5.501 rows=0 loops=1)
+              Index Cond: ((user_id = 'perf-heavy'::text) AND (exercise_id = '01a11ee7-5779-72bd-87b3-3275aaa73766'::uuid) AND (weight_kg > '0'::numeric))
+              Heap Fetches: 0
+              Buffers: shared hit=58
+
+## Statement 6: 0.001 ms
+Query: SELECT "public"."workout_sets"."id", "public"."workout_sets"."entry_id", "public"."workout_sets"."set_number", "public"."workout_sets"."reps", "public"."workout_sets"."weight", "public"."workout_sets"."unit", "public"."workout_sets"."performed_at" FROM "public"."workout_sets" WHERE 1=0 OFFSET $1
+Parameters: $1 = '0'
+
+Result  (cost=0.00..0.00 rows=0 width=0) (actual time=0.001..0.001 rows=0 loops=1)
+  One-Time Filter: false
+
+## Statement 7: 0.001 ms
+Query: SELECT "public"."workout_entries"."id", "public"."workout_entries"."utc_offset_minutes" FROM "public"."workout_entries" WHERE "public"."workout_entries"."id" IN (NULL) OFFSET $1
+Parameters: $1 = '0'
+
+Result  (cost=0.00..0.00 rows=0 width=0) (actual time=0.000..0.001 rows=0 loops=1)
+  One-Time Filter: false
+
+## Statement 8: 0.015 ms
+Query: SELECT "public"."workout_sets"."id" FROM "public"."workout_sets" WHERE ("public"."workout_sets"."user_id" = $1 AND "public"."workout_sets"."exercise_id" = $2 AND "public"."workout_sets"."weight_kg" = $3) LIMIT $4 OFFSET $5
+Parameters: $1 = 'perf-heavy', $2 = '01a11ee7-5779-72bd-87b3-3275aaa73766', $3 = '0', $4 = '1', $5 = '0'
+
+Limit  (cost=0.42..2.47 rows=1 width=16) (actual time=0.014..0.014 rows=1 loops=1)
+  Buffers: shared hit=4
+  ->  Index Only Scan using workout_sets_pr_covering_idx on workout_sets  (cost=0.42..100.75 rows=49 width=16) (actual time=0.013..0.014 rows=1 loops=1)
+        Index Cond: ((user_id = 'perf-heavy'::text) AND (exercise_id = '01a11ee7-5779-72bd-87b3-3275aaa73766'::uuid) AND (weight_kg = '0'::numeric))
+        Heap Fetches: 0
+        Buffers: shared hit=4

@@ -26,6 +26,25 @@ services:
         condition: service_healthy
     restart: "no"
 
+  # Optional performance dataset (docs/PERFORMANCE.md), never started by a plain `docker compose up`:
+  #   docker compose --profile perf run --rm seed-perf                                       # ~150k entries
+  #   docker compose --profile perf run --rm seed-perf node dist/cli/seed-perf.js --include-optional
+  # Built on the migrate stage, which has the dev dependencies the perf scripts need.
+  seed-perf:
+    profiles: [perf]
+    build:
+      context: .
+      target: migrate
+    command: ["node", "dist/cli/seed-perf.js"]
+    environment:
+      DATABASE_URL: postgresql://workouts:workouts@postgres:5432/workouts
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
   api:
     build:
       context: .

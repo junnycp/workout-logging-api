@@ -296,6 +296,73 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   ahead, 23 h accepted, 25 h rejected). One global `CLOCK` provider now serves POST and compare.
 - **Commit:** `5b98ad7`, `1769845` (helper), `9bedcc8` (e2e tests), `98b72f1` (POST rule), `fade932` (docs).
 
+### C23 — M7 plan: wrong measurement method, incomplete query inventory, unbounded tie query missed (2026-10-08, M7 analysis)
+- **AI output:** The first M7 plan (performance evidence) had five problems:
+  - It captured Prisma's SQL and re-ran `EXPLAIN ANALYZE` on it.
+  - It measured latency from inside the same process that serves the API.
+  - It listed the lookup helpers as one query each.
+  - It assumed the perf seed takes about 1 minute.
+  - It would have added extended statistics whenever a PR query used a Seq Scan.
+  It also generated ids with `uuidv7()` and dates relative to now, while claiming the dataset was deterministic.
+- **How detected:** I asked for a review before approving the plan. The `technical-leader` subagent ran spikes on
+  a throwaway database:
+  - Query events stringify every parameter into one JSON array (the `uuid[]` type is lost), and re-running
+    inserts under EXPLAIN ANALYZE would write rows.
+  - Prisma 7.10 runs a nested relation `select` as a separate statement.
+  - The tie-overflow query in records has no LIMIT: 66,668 tied sets took 73 ms plus 412 ms to load.
+  - The seed ran at about 8.9k rows/s.
+  - On a single-user table the planner chose a Seq Scan with an accurate estimate, and `CREATE STATISTICS` did
+    not change it.
+- **Outcome:** Plan rev. 2:
+  - Plans are now captured with `auto_explain` notices on a dedicated pool, calling the real services.
+  - Latency is measured against a separately running API.
+  - The query inventory is corrected, and a "plateau" scenario plus task T5 cover the unbounded tie query.
+  - Ids come from the seeded PRNG and dates from a fixed anchor.
+  - Statistics are added only on a misestimate of 10× or more that makes the plan worse.
+- **Commit:** `faf6580` (this entry). The plan itself is git-ignored; the implementation follows rev. 2
+  (`46bc352` … `682db8c`).
+
+### C24 — M7 implementation: plan deviation, uncommitted evidence and overstated claims (2026-10-09, M7 review)
+- **AI output:** The first M7 implementation and its write-up had these problems:
+  - **It did not follow the approved plan.** M7-A said `perf-single` is measured on its own. The AI seeded it with
+    the main dataset and measured everything with it in the table. The seed also never deleted optional users, so
+    a plain re-seed could not remove it.
+  - **It quoted numbers from a run that was never committed.** The D13 estimates (39,476 / 49,256) came from an
+    earlier run whose output was overwritten. "Within 2.3×" was false for committed plans (P4 3.6×, P6 689 vs 0).
+  - **It reported targets selectively.** A cold read statement at 84 ms, over the 50 ms DB target set in the plan,
+    was marked ✅. "Two unused indexes" was actually six. The bulk POST was described as two statements; the plan
+    shows five.
+  - **Test and fixture problems.** The parser fixture called "a real notice" had been edited. One test could not
+    fail: "independent of other users" generated the same spec twice.
+  - **Code defects.**
+    - Set ids within an entry were random, while the API's ascend with the set number.
+    - Every Bitmap Index Scan was counted as a big-table scan.
+    - Scenarios were hard-coded beside the profile and only checked HTTP status.
+    - POST scenarios ran before the `perf-single` ones.
+    - `idx_scan` was read before backends flushed their statistics.
+  - Earlier in the same milestone, the raw plan of the max bulk POST was 2 MB because all ~60,000 bind
+    parameters were printed (`e7119ab`).
+- **How detected:** The independent `technical-leader` review of the branch. It checked every number in
+  PERFORMANCE.md against `docs/perf/`, grepped the committed files for the quoted estimates, re-parsed all 282 scan
+  lines of the raw plans, and counted `perf-single` rows in the database.
+- **Outcome:**
+  - Each defect was fixed test-first in its own commit: the seed deletes every profile user, set ids ascend,
+    bitmap scans are attributed to their table, a real fixture is used plus edge cases, and a golden fingerprint
+    plus an independence test that can fail.
+  - The scripts were fixed: scenarios come from the profile and assert their content, writes run last, `--only`
+    is added, and statistics are flushed before reading.
+  - Everything was re-measured as approved: the main dataset (cold, warm, latency), then `perf-single` alone.
+  - PERFORMANCE.md and DESIGN were rewritten from committed numbers only. The targets are copied verbatim, with the
+    cold miss stated (61 ms).
+  - New rule followed from here on: a number in a document must come from a committed artifact or be marked as
+    command output.
+  A second review of the fixes found three more slips in the rewritten documents, now fixed:
+  - "Within 1.2×" was still false (the plateau scan is 3.5×).
+  - The index bloat from re-seeding was not disclosed (the PR figures are about 30 % pessimistic).
+  - Two figures were off by one or too wide.
+- **Commit:** `e7119ab`, `cba660d` + `7bf43ae`, `9da8126` + `3cbb15e`, `5799a36`, `b28a09f` + `89741e7`,
+  `2e38219`, `d275043`, `05c2552`, `fa59066`, `bee73b0`, `cb67d57`.
+
 ## 4. Rejected AI suggestions
 
 | Date | Decision | AI suggested | I decided | Reason |

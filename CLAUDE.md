@@ -37,6 +37,9 @@ npm run test:e2e                 # integration tests, Testcontainers Postgres (C
 npm run prisma:generate          # regenerate src/generated/prisma after schema changes
 npx prisma migrate dev --name <change>   # new migration; never edit an applied migration
 npm run seed                     # build, then sync prisma/seed/exercise-catalog.json (idempotent; needs DATABASE_URL)
+npm run seed:perf                # 50k-entry perf dataset from prisma/seed/perf-profile.json (~2 min; `-- --include-optional` adds perf-single)
+npm run perf:plans -- --label warm      # auto_explain plans of every scenario -> docs/perf/plans/<label>/
+npm run perf:latency -- --label warm    # p50/p95 against a running API (PERF_API_URL) -> docs/perf/latency-<label>.md
 ```
 
 Keep this section in sync with `package.json` when scripts change.
