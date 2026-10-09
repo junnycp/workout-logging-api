@@ -3,6 +3,27 @@
 How AI was used to build this project, including where it was wrong and what was rejected.
 Entries are added as events happen (not reconstructed at the end). Dates are local (UTC+7).
 
+**Summary**
+- **Tools.** Claude Code (Claude Opus 5.5) wrote nearly all code, tests and docs. A `technical-leader` subagent
+  reviewed each milestone independently, and from M7 on each plan too. I approved the design decisions (D1–D13)
+  before they were implemented.
+- **Strategy.** A rules file (`CLAUDE.md`), then plans with numbered decisions before code. Spikes on a real
+  Postgres decided questions instead of model memory. Tests came first for the domain logic, correction commits are
+  separate, and an independent review ran before every merge. §2 shows how the rules changed after mistakes.
+- **26 corrections** where AI output was wrong or suboptimal (§3). The most instructive:
+  - C17: stored instants were shifted by the database session time zone.
+  - C21: PRs were ranked on rounded values.
+  - C22: future-dated logs became permanent PRs.
+  - C24: performance claims were not backed by committed evidence.
+  - C26: personal data was written to the access logs.
+- **7 rejected suggestions** (§4), e.g. auto-creating unknown exercises, and special-casing Epley at 1 rep against
+  the brief.
+- **Line-by-line explanation** of one AI-written piece: the keyset history query (§5).
+
+**Contents:** [1. Tools](#1-tools-and-purposes) · [2. Prompting strategy](#2-prompting-strategy) ·
+[3. Corrections log](#3-corrections-log-ai-output-that-was-wrong-or-suboptimal) ·
+[4. Rejected suggestions](#4-rejected-ai-suggestions) · [5. Code explained line by line](#5-ai-generated-code-explained-line-by-line)
+
 ## 1. Tools and purposes
 
 | Tool | Used for |
@@ -10,6 +31,8 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
 | Claude Code (Claude Opus 5.5, VS Code extension) | Requirement analysis, architecture/plan drafting, verification spikes, environment setup, implementation, tests, documentation |
 | `technical-leader` subagent (`.claude/agents/technical-leader.md`) | Senior-engineer persona for design decisions, TDD implementation and diff review |
 | Official docs fetched by the agent (code.claude.com, docs.nestjs.com, prisma.io, orm.drizzle.team, PostgreSQL, Wikipedia for the 1RM definition) | Grounding claims instead of relying on model memory |
+| Fresh `technical-leader` review agents | One per plan and per milestone, plus a final whole-repository review (M8): read-only, they ran spikes on throwaway databases and reported findings that I then had fixed (C12, C13, C17, C21, C23–C26) |
+| Spikes run by the agent (Testcontainers, a scratch Postgres, `auto_explain`, `EXPLAIN ANALYZE`) | Settling technical questions with measurements: Prisma capabilities (D1), pagination cost (C3), index choice (D10), performance evidence (M7) |
 
 ## 2. Prompting strategy
 
@@ -24,6 +47,20 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
 - **"Verify, don't assert."** When a claim mattered (e.g. "can Prisma do this?"), I asked the AI to prove it with a
   runnable spike against a real Postgres instead of answering from memory.
 - **Small scopes.** Work is split into milestones (M1–M8) with a stop for my review after each one.
+
+**How the rules changed.** Rules in place from day one (`a68da97`, 2026-10-02): plan first, tests first for domain
+logic, independent review before committing, correction commits kept separate, every AI mistake logged here.
+Later changes to `CLAUDE.md`, each from its git history:
+
+| Commit | Date | Rule added or changed | Trigger |
+|---|---|---|---|
+| `2041534` | 10-05 | Approved design decisions written into the rules: exactly two raw SQL queries; the unit column is plain varchar and the registry is the single source | Design approval (D1, X1) |
+| `f5efa4a` | 10-05 | Never push without an explicit request; approval to commit is not approval to push | C5 |
+| `cee5cef` | 10-05 | Stack versions pinned with an ADR (Node 24, NestJS 12, TypeScript 6.0) | C7 |
+| `3352513` | 10-05 | One branch per milestone, merged with `--no-ff`, tagged `mN-done` | Making milestone boundaries visible in the history |
+| `28e7f17` | 10-05 | Response values are recomputed from the original weight and rounded once | C16 |
+| `fade932` | 10-08 | Dates more than 24 h in the future are rejected (D12) | C22 |
+| `b9780db` | 10-09 | Every number in a document comes from a committed artifact or is marked as command output; hand-added migration SQL clarified | C24 |
 
 ## 3. Corrections log (AI output that was wrong or suboptimal)
 
@@ -421,9 +458,38 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
 | 2026-10-02 | D9 Catalog endpoint | `GET /exercises?search=` so clients can discover valid names | Rejected | Keep scope controlled; avoid over-engineering |
 | 2026-10-05 | D3 Epley at reps = 1 | Special-case reps = 1 → e1RM = weight (convention r > 1) | Apply the brief's formula literally for all reps | Respect the brief: the formula is explicitly specified |
 | 2026-10-05 | D1 Data access | Drizzle via `@nestjs/drizzle` | Prisma (verified by spike, C1) | Prior experience with Prisma; spike showed it covers the brief |
-| 2026-10-08 | M6 verification | Enable `stopAtFirstError` in the global ValidationPipe so a missing field reports one detail instead of several (`IS_DEFINED, BLANK, MAX_LENGTH, IS_STRING`) | Keep reporting every failed constraint | Reason not recorded |
 | 2026-10-05 | Pre-M5 check, finding F2 | Expose the weight-unit registry as a Nest provider (`WEIGHT_UNIT_REGISTRY`) because DESIGN listed that token and DI is graded | Keep the static registry; correct DESIGN instead | X1 is already met by one registry entry; the DTO validator cannot use DI anyway, so a token would add a second access path to the same object |
+| 2026-10-08 | M6 verification | Enable `stopAtFirstError` in the global ValidationPipe so a missing field reports one detail instead of several (`IS_DEFINED, BLANK, MAX_LENGTH, IS_STRING`) | Keep reporting every failed constraint | Reason not recorded |
 
 ## 5. AI-generated code explained line by line
 
-_To be chosen after implementation (candidates: keyset pagination query, idempotent bulk-insert transaction)._
+**Piece:** `WorkoutHistoryRepository.findPage` in
+[src/workouts/workout-history.repository.ts](src/workouts/workout-history.repository.ts), lines 45–79. It was written
+by the AI in `10ecfff` (M5). Every commit in this repository carries the Claude co-author trailer; this piece's
+history is `10ecfff`, plus the session fix in `e62f55e` (C17) that it depends on.
+
+**What it does.** It returns one page of a user's workout entries, newest first. It continues after a cursor,
+optionally limited to a date range and to a set of exercises. Sets and exercise details are loaded afterwards by two
+more queries, never per row.
+
+**Why raw SQL.** Prisma's own cursor pagination skips to the cursor row with `OFFSET`-like work. At depth 49,000 it
+took 5.8 ms ("Rows Removed by Filter: 49000"), against 0.056 ms for a row-comparison keyset (C3, DESIGN §13a).
+`CLAUDE.md` allows exactly two typed raw queries; this is one of them.
+
+| Lines | Code | Why |
+|---|---|---|
+| 46 | ``conditions = [Prisma.sql`e.user_id = ${query.userId}`]`` | Every condition is a `Prisma.sql` fragment, so values are bind parameters (`$1`), never string-concatenated. The list starts with the user, the leading column of both history indexes |
+| 47–50 | `e.performed_at >= ${gte}::timestamptz`, `< ${lt}` | The date range as a half-open UTC interval `[gte, lt)`, already resolved from `from`/`to`/`tz` by the service. The adapter sends JS Dates without an offset, so they are read correctly only because the session is pinned to UTC. C17: on a server whose default zone was Asia/Ho_Chi_Minh, `10:00Z` was stored as `03:00Z` and bounds were read 7 hours off. Reads shifted back the same way, so the API looked right and every test passed |
+| 51–54 | `(e.performed_at, e.id) < (${after.performedAt}, ${after.id})` | The keyset cursor. A **row comparison** continues strictly after the last row of the previous page in `(performed_at DESC, id DESC)` order. `id` breaks ties between entries with the same instant, so no entry is skipped or repeated. Postgres uses it as an index condition, so the scan starts at the cursor: the cost is the page size, not the depth |
+| 56–57 | `columns` | Only the four columns the service needs, aliased to camelCase for the TypeScript row type |
+| 59–65 | No exercise filter | One index scan of `(user_id, performed_at DESC, id DESC)` in index order, stopped by `LIMIT ${take}`. The service passes `take = limit + 1`: an extra row means `hasMore` (`workout-history.service.ts` lines 47–49) without a `COUNT(*)` |
+| 67–69 | `unnest(${exerciseIds}::uuid[]) AS x(exercise_id)` | With a name or muscle-group filter, the service has already resolved the exercise ids (and returned an empty page itself when there are none, so the array is never empty here). `unnest` turns the array parameter into rows: one per exercise |
+| 70–76 | `CROSS JOIN LATERAL (… WHERE e.exercise_id = x.exercise_id AND <conditions> … LIMIT ${take})` | For **each** exercise, the newest `take` matching rows from `(user_id, exercise_id, performed_at DESC, id DESC)`. The user, range and cursor conditions are repeated **inside** each subquery so every per-exercise scan starts at the cursor and stops after `take` rows (decision M5-A). The rejected alternative, `exercise_id = ANY(…)` on the user index, walked the user's whole timeline and skipped about 21k rows when the exercise was only logged long ago |
+| 77–78 | `ORDER BY p."performedAt" DESC, p.id DESC LIMIT ${take}` | Merges the per-exercise lists: at most `ids × take` rows are sorted, and the newest `take` win. The outer order must repeat the inner one exactly, or the cursor of the next page would not match |
+
+**Pinned by tests:**
+- `workouts-history.e2e-spec.ts`: "serves every entry exactly once across pages, even when many share one instant"
+  (25 entries at one instant over pages of 10); the same through the `LATERAL` path and with a date range plus
+  `unit=lb`; "covers all 25 hours of a DST fall-back day".
+- `session-timezone.e2e-spec.ts`: exact instants on a database whose default zone is not UTC (C17).
+- `docs/perf/plans/warm/H2-history-deep-cursor.txt`: the plan of a page at depth 49k reads about 20 index rows.
