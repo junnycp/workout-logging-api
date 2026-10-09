@@ -356,8 +356,12 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
     cold miss stated (61 ms).
   - New rule followed from here on: a number in a document must come from a committed artifact or be marked as
     command output.
+  A second review of the fixes found three more slips in the rewritten documents, now fixed:
+  - "Within 1.2×" was still false (the plateau scan is 3.5×).
+  - The index bloat from re-seeding was not disclosed (the PR figures are about 30 % pessimistic).
+  - Two figures were off by one or too wide.
 - **Commit:** `e7119ab`, `cba660d` + `7bf43ae`, `9da8126` + `3cbb15e`, `5799a36`, `b28a09f` + `89741e7`,
-  `2e38219`, `d275043`, `05c2552`, `fa59066`.
+  `2e38219`, `d275043`, `05c2552`, `fa59066`, `bee73b0`, `cb67d57`.
 
 ## 4. Rejected AI suggestions
 
