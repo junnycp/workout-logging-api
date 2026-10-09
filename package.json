@@ -22,7 +22,8 @@
     "postinstall": "prisma generate",
     "seed": "npm run -s build && node dist/cli/seed-catalog.js",
     "seed:perf": "npm run -s build && node dist/cli/seed-perf.js",
-    "perf:plans": "npm run -s build && LOG_LEVEL=${LOG_LEVEL:-warn} node dist/cli/perf-plans.js"
+    "perf:plans": "npm run -s build && LOG_LEVEL=${LOG_LEVEL:-warn} node dist/cli/perf-plans.js",
+    "perf:latency": "npm run -s build && node dist/cli/perf-latency.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.2",
