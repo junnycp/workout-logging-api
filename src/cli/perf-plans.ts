@@ -10,7 +10,7 @@ import { envSchema } from '../config/env.schema';
 import { createPgAdapter } from '../database/pg-adapter';
 import { PrismaService } from '../database/prisma.service';
 import { PrismaClient } from '../generated/prisma/client';
-import { ExplainedStatement, markdownTable, parseAutoExplain } from '../perf/report';
+import { ExplainedStatement, markdownTable, parseAutoExplain, truncate } from '../perf/report';
 import {
   buildScenarios,
   deleteWrittenRows,
@@ -46,6 +46,8 @@ const AUTO_EXPLAIN = [
 ].join(' ');
 
 const BIG_TABLES = new Set(['workout_entries', 'workout_sets']);
+/** Query text and parameters kept per statement in the raw plan files. */
+const MAX_TEXT = 2_000;
 
 const describeRequest = (request: PerfRequest): string =>
   `${request.method} ${urlOf('http://api', request).replace('http://api', '')}` +
@@ -63,8 +65,8 @@ function rawPlanFile(
     '',
     ...statements.flatMap((s, i) => [
       `## Statement ${i + 1}: ${s.durationMs} ms`,
-      `Query: ${s.queryText}`,
-      ...(s.parameters ? [`Parameters: ${s.parameters}`] : []),
+      `Query: ${truncate(s.queryText, MAX_TEXT)}`,
+      ...(s.parameters ? [`Parameters: ${truncate(s.parameters, MAX_TEXT)}`] : []),
       '',
       s.planText,
       '',

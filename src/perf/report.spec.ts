@@ -1,4 +1,4 @@
-import { markdownTable, parseAutoExplain, percentile, summarize } from './report';
+import { markdownTable, parseAutoExplain, percentile, summarize, truncate } from './report';
 
 /** A real auto_explain notice (PG16) captured from the PR candidate query on the perf dataset. */
 const PR_NOTICE = `duration: 98.653 ms  plan:
@@ -102,5 +102,12 @@ describe('parseAutoExplain', () => {
 
   it('keeps the plan text for the raw plan files', () => {
     expect(parseAutoExplain(SEQ_NOTICE).planText).toMatch(/^Limit {2}\(cost/);
+  });
+});
+
+describe('truncate', () => {
+  it('keeps short text and shortens long text with the number of characters left out', () => {
+    expect(truncate('short', 10)).toBe('short');
+    expect(truncate('x'.repeat(25), 10)).toBe('xxxxxxxxxx… (15 more characters)');
   });
 });

@@ -24,6 +24,13 @@ export function summarize(values: readonly number[]): LatencySummary {
   };
 }
 
+/** Shortens text beyond `max` characters (a bulk insert prints tens of thousands of parameters). */
+export function truncate(text: string, max: number): string {
+  return text.length <= max
+    ? text
+    : `${text.slice(0, max)}… (${text.length - max} more characters)`;
+}
+
 type Cell = string | number;
 
 /** GitHub markdown table; columns whose cells are all numbers are right-aligned. */
