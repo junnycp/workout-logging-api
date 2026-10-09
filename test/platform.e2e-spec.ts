@@ -90,6 +90,26 @@ describe('Platform behaviour (e2e)', () => {
         .expect(415);
       expect(errorBodyOf(res).error.code).toBe('UNSUPPORTED_MEDIA_TYPE');
     });
+
+    it.each([
+      ['text/plain', 'hello'],
+      ['application/x-www-form-urlencoded', 'entries=1'],
+    ])('returns 415 for a %s body instead of reporting missing fields', async (type, body) => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/users/u1/workouts')
+        .set('content-type', type)
+        .send(body)
+        .expect(415);
+      expect(errorBodyOf(res).error).toMatchObject({
+        code: 'UNSUPPORTED_MEDIA_TYPE',
+        message: 'Request body must be application/json',
+      });
+    });
+
+    it('validates a POST without a body as an empty request, not as a media-type problem', async () => {
+      const res = await request(app.getHttpServer()).post('/api/v1/users/u1/workouts').expect(400);
+      expect(errorBodyOf(res).error.code).toBe('VALIDATION_ERROR');
+    });
   });
 
   describe('OpenAPI', () => {
