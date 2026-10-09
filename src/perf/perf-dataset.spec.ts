@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import Decimal from 'decimal.js';
 import { computeSetMetrics } from '../workouts/domain/set-metrics';
 import { generateUserDataset, PerfUserDataset } from './perf-dataset';
@@ -115,6 +116,16 @@ describe('expandUsers', () => {
 describe('generateUserDataset', () => {
   it('generates the same rows, ids included, on every run', () => {
     expect(generateUserDataset(profile, heavySpec(), exerciseIds)).toEqual(heavy);
+  });
+
+  it('generates exactly the recorded rows on any machine (golden fingerprint)', () => {
+    // Recorded from the implementation. A change here means every published measurement used other data:
+    // regenerate on purpose, re-seed and re-measure (docs/PERFORMANCE.md).
+    expect(heavy.entries[0]?.id).toBe('018af156-eb40-7208-901b-19553f5df553');
+    expect(heavy.sets).toHaveLength(13_470);
+    expect(createHash('sha256').update(JSON.stringify(heavy)).digest('hex')).toBe(
+      'd513530d809e932077ea231b07dd62b3f1bd49dfbdfb7f8b15aa352603ba65a6',
+    );
   });
 
   it('gives a user the same rows whatever other users the profile lists', () => {
