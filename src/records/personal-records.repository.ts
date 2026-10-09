@@ -73,7 +73,7 @@ export class PersonalRecordsRepository {
 
   /**
    * Details of the candidate sets of every record in a request: two statements (sets, then their entries'
-   * offsets), whatever the number of candidates; Prisma splits a very long id list into chunks.
+   * offsets), more when Prisma splits a very long id list into chunks (thousands of tied candidates).
    */
   async findSets(ids: string[]): Promise<Map<string, RecordSetRow>> {
     const rows = await this.prisma.workoutSet.findMany({
