@@ -118,6 +118,14 @@ describe('resolveDateRange', () => {
     ]);
   });
 
+  it('handles a 25-hour DST day (America/New_York, 2025-11-02, clocks fall back)', () => {
+    const result = resolveDateRange({ from: '2025-11-02', to: '2025-11-02' }, 'America/New_York');
+    expect(result.ok && [iso(result.value.gte), iso(result.value.lt)]).toEqual([
+      '2025-11-02T04:00:00.000Z',
+      '2025-11-03T05:00:00.000Z',
+    ]);
+  });
+
   it('treats a datetime "to" as inclusive', () => {
     const result = resolveDateRange({ to: '2026-10-01T12:00:00Z' }, 'UTC');
     expect(result.ok && [result.value.gte, iso(result.value.lt)]).toEqual([
@@ -162,6 +170,16 @@ describe('periodRanges ("this month vs last month")', () => {
       '2026-08-31T17:00:00.000Z',
       '2026-09-30T17:00:00.000Z',
     ]);
+  });
+
+  it('puts month boundaries at local midnight on both sides of a DST change (America/New_York)', () => {
+    // April starts in daylight time (UTC-4); March started in standard time (UTC-5), so it is 1 hour short.
+    const ranges = periodRanges('month', new Date('2026-04-10T12:00:00Z'), 'America/New_York');
+    expect([iso(ranges.previous.gte), iso(ranges.previous.lt)]).toEqual([
+      '2026-03-01T05:00:00.000Z',
+      '2026-04-01T04:00:00.000Z',
+    ]);
+    expect(iso(ranges.current.gte)).toBe('2026-04-01T04:00:00.000Z');
   });
 
   it('gives February 29 days in a leap year', () => {
