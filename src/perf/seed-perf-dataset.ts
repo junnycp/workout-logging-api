@@ -18,10 +18,13 @@ const chunks = <T>(rows: T[], size: number): T[][] =>
   );
 
 /**
- * Replaces the rows of the profile's users with freshly generated (deterministic) ones, then VACUUM ANALYZE so
- * the visibility map and planner statistics are current, as autovacuum would leave them in production.
- * Sets are deleted before entries: through the covering index that leads with user_id, instead of one
- * cascade per entry. Rows of other users are never touched.
+ * Replaces the rows of every user in the profile (optional ones included) with freshly generated, deterministic
+ * rows for the selected users, so the dataset is exactly what this run asked for: a seed without
+ * `includeOptional` also removes a perf-single left by an earlier run. Then VACUUM ANALYZE, so the visibility map
+ * and planner statistics are current, as autovacuum would leave them in production.
+ * Sets are deleted before entries, through the covering index that leads with user_id, so the entries' cascade
+ * finds nothing left to delete. Rows of users outside the profile are never touched. Not atomic: a failure after
+ * the deletes leaves a partial dataset, which the next run replaces.
  */
 export async function seedPerfDataset(
   prisma: PrismaClient,
@@ -30,12 +33,14 @@ export async function seedPerfDataset(
 ): Promise<SeedPerfReport> {
   const users = expandUsers(profile, options);
   const userIds = users.map((user) => user.id);
+  const profileUserIds = expandUsers(profile, { includeOptional: true }).map((user) => user.id);
   const exercises = await prisma.exercise.findMany({ select: { id: true, name: true } });
   const exerciseIds = new Map(exercises.map((exercise) => [exercise.name, exercise.id]));
 
-  await prisma.workoutSet.deleteMany({ where: { userId: { in: userIds } } });
-  await prisma.workoutEntry.deleteMany({ where: { userId: { in: userIds } } });
-  await prisma.idempotencyKey.deleteMany({ where: { userId: { in: userIds } } });
+  const where = { userId: { in: profileUserIds } };
+  await prisma.workoutSet.deleteMany({ where });
+  await prisma.workoutEntry.deleteMany({ where });
+  await prisma.idempotencyKey.deleteMany({ where });
 
   const report: SeedPerfReport = { users: userIds, entries: 0, sets: 0 };
   for (const user of users) {
