@@ -1,5 +1,6 @@
 import type { IncomingMessage } from 'node:http';
 import type { ConfigService } from '@nestjs/config';
+import type { DestinationStream } from 'pino';
 import { HttpLogger, pinoHttp } from 'pino-http';
 import type { Env } from '../../config/env.schema';
 import { REQUEST_ID_HEADER, resolveRequestId } from './request-id';
@@ -23,18 +24,25 @@ export function serializeRequest(req: { id?: unknown; method?: unknown; url?: un
  * (so requests rejected by the parser or by the 404 fallback still get an access-log line), and
  * nestjs-pino reuses its logger via `useExisting`, so there is one pino logger and one transport.
  */
-export function createHttpLogger(config: ConfigService<Env, true>): HttpLogger {
-  return pinoHttp({
-    level: config.get('LOG_LEVEL', { infer: true }),
-    // requestIdMiddleware runs first and has already assigned req.id; this is only a fallback.
-    genReqId: (req: IncomingMessage & { id?: unknown }) =>
-      typeof req.id === 'string' ? req.id : resolveRequestId(req.headers[REQUEST_ID_HEADER]),
-    // Request bodies, headers and client addresses are never logged.
-    serializers: { req: serializeRequest },
-    autoLogging: { ignore: (req: IncomingMessage) => req.url === '/health' },
-    transport:
-      config.get('NODE_ENV', { infer: true }) === 'development'
-        ? { target: 'pino-pretty', options: { singleLine: true } }
-        : undefined,
-  });
+/** `destination` defaults to stdout; tests pass a capture stream. */
+export function createHttpLogger(
+  config: ConfigService<Env, true>,
+  destination?: DestinationStream,
+): HttpLogger {
+  return pinoHttp(
+    {
+      level: config.get('LOG_LEVEL', { infer: true }),
+      // requestIdMiddleware runs first and has already assigned req.id; this is only a fallback.
+      genReqId: (req: IncomingMessage & { id?: unknown }) =>
+        typeof req.id === 'string' ? req.id : resolveRequestId(req.headers[REQUEST_ID_HEADER]),
+      // Request bodies, headers and client addresses are never logged.
+      serializers: { req: serializeRequest },
+      autoLogging: { ignore: (req: IncomingMessage) => req.url === '/health' },
+      transport:
+        config.get('NODE_ENV', { infer: true }) === 'development'
+          ? { target: 'pino-pretty', options: { singleLine: true } }
+          : undefined,
+    },
+    destination,
+  );
 }
