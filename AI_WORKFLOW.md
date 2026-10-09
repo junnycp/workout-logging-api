@@ -386,6 +386,32 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   - The `resolve` change is dropped.
 - **Commit:** none yet (plan stage).
 
+### C26 — Final whole-repo review: personal data in access logs and four smaller defects (2026-10-09, M8 review)
+- **AI output:** Code written in earlier milestones that passed every test and every per-milestone review:
+  - **Personal data in the access log.** M1 relied on pino-http's default request serializer and redacted only
+    `authorization` and `cookie`. Every access line still held the client IP, user agent, X-Forwarded-For and
+    Idempotency-Key, against the CLAUDE.md "no PII in logs" rule.
+  - **Misleading errors for non-JSON bodies.** A text or form body came back as "entries should not be null or
+    undefined" instead of 415.
+  - **A wrong comment on the PR query.** It claimed the index scan reads "the top 50"; it reads the whole
+    (user, exercise) slice.
+  - **Detail codes scattered across files.** Thirteen detail codes were string literals in a dozen files, although
+    CLAUDE.md says codes live in `error-codes.ts`.
+  - **A repository named as a service.** `ExerciseLookupService` queried Prisma directly, breaking the
+    service/repository layering.
+- **How detected:** For M8 I asked for a timeboxed review of the whole repository, not a diff, by the
+  `technical-leader` subagent.
+  - It read `pino-std-serializers` to see what the default serializer logs; I confirmed this on a container log
+    line.
+  - It inferred the 415 gap from the parser setup; I confirmed it with curl.
+- **Outcome:** Test-first fixes, each in its own commit:
+  - Access logs keep only the request id, method and URL.
+  - A body that is not JSON gets 415; a request without a body is still validated.
+  - The comment now describes what the scan really does.
+  - A `DetailCode` list was added, and the repository was renamed.
+  - Findings outside the M8 scope are listed as follow-ups in the README.
+- **Commit:** `a0682b8` + `14a4a22` (logging), `36fd5f4` + `065d905` (415), `cf32708`, `50ed9f0`, `d3b2526`.
+
 ## 4. Rejected AI suggestions
 
 | Date | Decision | AI suggested | I decided | Reason |
