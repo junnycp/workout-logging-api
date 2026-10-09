@@ -58,3 +58,11 @@ revised total from 34 – 44 h to 36.5 – 46.75 h. Reasons:
   user.
 
 Actual time is filled in at the end with the other items.
+
+## Revision for M8 (2026-10-09, before starting)
+
+M8 covers the README, the AI_WORKFLOW finalization, a brief-to-test traceability audit with the missing edge-case
+tests, a timeboxed whole-repo review, and preparation of the video. It is estimated at **9.5 – 12.75 h**. That
+replaces items 7 (4 – 5 h), 9 (3 h), 10 (1 – 1.5 h) and 11 (2 – 3 h), which total 10 – 12.5 h, so the overall total
+changes by −0.5 / +0.25 h. Most of the cross-milestone test hardening (item 7) was done inside M3 – M7.
+
