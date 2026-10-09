@@ -9,33 +9,32 @@ Date: 2026-10-02
 
 Every requirement gets an ID; tests and README sections reference these IDs.
 
-| ID | Requirement (from brief) | Where it is satisfied |
-|----|--------------------------|-----------------------|
-| R1.1 | Log entry: userId, date, exerciseName, sets[{reps, weight, unit}] | `POST /users/:userId/workouts` |
-| R1.2 | Units kg, lb | Unit registry |
-| R1.3 | Store original + normalized kg | `workout_sets.weight`, `unit`, `weight_kg` |
-| R1.4 | Bulk: multiple exercises per request | `entries[]` in one transaction |
-| R2.1 | History for a user | `GET /users/:userId/workouts` |
-| R2.2 | Filter: exercise name, partial match | `exercise` query, trigram index |
-| R2.3 | Filter: date range | `from`, `to`, `tz` |
-| R2.4 | Filter: muscle group (if metadata exists) | `muscleGroup`, configurable mapping tables |
-| R2.5 | Return in requested unit | `unit` query param |
-| R2.6 | Pagination (cursor or offset) | Keyset cursor on `(performed_at, id)` |
-| R3.1 | PR: heaviest single set | `maxWeight` |
-| R3.2 | PR: highest volume set (reps × weight) | `maxVolume` |
-| R3.3 | PR: best Epley 1RM = weight × (1 + reps/30) | `bestEstimated1RM` |
-| R3.4 | Date each PR was achieved | `achievedAt` + `localDate` on each PR |
-| R3.5 | Compare PRs across ranges (this month vs last month) | `GET .../personal-records/compare` |
-| E1 | Invalid/unsupported unit | 400 `VALIDATION_ERROR`, detail code `UNSUPPORTED_UNIT` |
-| E2 | Missing/malformed fields (null date, negative weight/reps, empty sets) | DTO validation, field paths in `details` |
-| E3 | Empty date range → empty result + message, not error | 200, `data: []`, `meta.message` |
-| E4 | Timezone strategy documented | UTC storage + request `tz` (Section 5) |
-| E5 | Concurrent writes, same user + exercise | Transactions, idempotent catalog upsert, `Idempotency-Key` (Section 6) |
-| E6 | 50k+ entries per user performs well | Index design + perf seed + `EXPLAIN ANALYZE` evidence (Section 7) |
-| X1 | New unit (e.g. stone) = minimal change | Single registry entry drives validation, Swagger, conversion |
-| X2 | Exercise → muscle group mapping configurable | JSON catalog synced to tables, no mapping in code |
-| T | NestJS, Postgres/Mongo justified, no auth, userId param | Section 2 |
-
+| ID | Requirement (from brief) | Where it is satisfied | Tested by (spec: test) |
+|----|--------------------------|-----------------------|------------------------|
+| R1.1 | Log entry: userId, date, exerciseName, sets[{reps, weight, unit}] | `POST /users/:userId/workouts` | workouts-create: "stores several exercises in one request, keeping the original weight and the kg value" |
+| R1.2 | Units kg, lb | Unit registry (`src/units/weight-units.ts`) | weight-units.spec: "supports kg and lb by default" |
+| R1.3 | Store original + normalized kg | `workout_sets.weight`, `unit`, `weight_kg` | workouts-create: same as R1.1, "rounds the response kg from the exact conversion…"; set-metrics.spec |
+| R1.4 | Bulk: multiple exercises per request | `entries[]` in one transaction | workouts-create: "accepts the maximum payload: 100 entries of 50 sets", "reports problems in several entries at once and stores none of the valid ones" |
+| R2.1 | History for a user | `GET /users/:userId/workouts` | workouts-history: "returns entries newest first…", "never returns another user's entries" |
+| R2.2 | Filter: exercise name, partial match | `exercise` query, `exercise_names` + trigram index | workouts-history: "matches part of a name, case-insensitively", "matches aliases"; catalog-sync: "serves partial name matches from the trigram index" |
+| R2.3 | Filter: date range | `from`, `to`, `tz` | workouts-history: "reads date-only bounds as whole days in the requested time zone", "treats a datetime bound as inclusive", "covers all 25 hours of a DST fall-back day" |
+| R2.4 | Filter: muscle group (if metadata exists) | `muscleGroup`, catalog mapping tables | workouts-history: "filters by muscle group, including secondary muscles", "rejects an unknown muscle group…" |
+| R2.5 | Return in requested unit | `unit` query param | workouts-history: "converts every set from its original value and rounds once" |
+| R2.6 | Pagination (cursor or offset) | Keyset cursor on `(performed_at, id)` | workouts-history: "serves every entry exactly once across pages, even when many share one instant" (+ filtered and ranged variants); cursor.spec |
+| R3.1 | PR: heaviest single set | `maxWeight` | personal-records: "returns each record with the set and the date it was achieved"; record-metrics.spec |
+| R3.2 | PR: highest volume set (reps × weight) | `maxVolume` | same; set-metrics.spec: "is reps × weight" |
+| R3.3 | PR: best Epley 1RM = weight × (1 + reps/30) | `bestEstimated1RM` | set-metrics.spec: "applies the formula literally at 1 rep…"; personal-records: "picks 100 kg × 1 over 96 kg × 2…" |
+| R3.4 | Date each PR was achieved | `achievedAt` + `localDate` on each PR | personal-records: "returns each record with the set and the date it was achieved"; tie-breaks: "prefers the earliest date when value and reps tie" |
+| R3.5 | Compare PRs across ranges (this month vs last month) | `GET .../personal-records/compare` | personal-records: "compares this month to date with last month, in the requested time zone", "compares two explicit ranges…" |
+| E1 | Invalid/unsupported unit | 400 `VALIDATION_ERROR`, detail `UNSUPPORTED_UNIT` | workouts-create: "rejects unsupported unit", "rejects an unsupported unit in a later entry and set"; records/compare: "rejects an unsupported unit" |
+| E2 | Missing/malformed fields (null date, negative weight/reps, empty sets) | DTO validation, field paths in `details` | workouts-create: 39-case table ("rejects null date", "rejects negative weight", "rejects empty sets array", "rejects null sets", …) |
+| E3 | Empty date range → empty result + message, not error | 200, `data: []` / null records, `meta.message` | workouts-history "reads date-only bounds…" (empty UTC case); personal-records: "returns null records with a message when the range has no sets", "adds a message when neither period has sets" |
+| E4 | Timezone strategy documented | UTC storage + request `tz` (Section 6, README §7) | time.spec (23/25-hour DST days, Santiago skipped midnight, month boundaries across DST); session-timezone e2e |
+| E5 | Concurrent writes, same user + exercise | Append-only transactions, `Idempotency-Key` (Section 7) | workouts-concurrency: "commits every request when the same user logs the same exercise at the same instant" (+ 2 key races) |
+| E6 | 50k+ entries per user performs well | Index design + perf dataset + measurements (Section 8) | Not a test (machine-dependent): `docs/PERFORMANCE.md`, `npm run perf:plans` / `perf:latency` |
+| X1 | New unit (e.g. stone) = minimal change | Single registry entry drives validation, Swagger, conversion | weight-units.spec: "accepts a new unit with a single registry entry"; record-metrics.spec: "works for a unit added to the registry"; platform: "lists the weight-unit registry as the unit enum everywhere" |
+| X2 | Exercise → muscle group mapping configurable | JSON catalog synced to tables, no mapping in code | catalog-sync: "applies mapping changes and alias moves from an edited catalog"; catalog-doc.spec |
+| T | NestJS, Postgres/Mongo justified, no auth, userId param | Section 2, README §2 | — |
 ---
 
 ## 2. Technology decisions
@@ -142,6 +141,9 @@ Design notes (go into README):
 ---
 
 ## 4. API design
+
+> Design record of the API as approved and refined per milestone. **The current contract is the README §3 and
+> Swagger (`/docs`)**; where they differ, they win.
 
 Base: `/api/v1`. JSON camelCase. All errors use one envelope.
 
@@ -442,8 +444,7 @@ are separate commits and logged in AI_WORKFLOW.md.
 - `AI_WORKFLOW.md` sections: Tools & purposes · Prompting strategy · Corrections log (wrong/suboptimal) ·
   Rejected suggestions · Line-by-line explanation candidate (likely the keyset pagination query or the
   idempotency transaction).
-- Only real events are logged. Candidate already observed (needs your OK to log): the AI's initial stack choice
-  in CLAUDE.md (Prisma) was revised during this deeper analysis (D1).
+- Only real events are logged (C1–C26 in AI_WORKFLOW.md); the line-by-line piece is `WorkoutHistoryRepository.findPage`.
 
 ## 13. Decisions
 
@@ -457,7 +458,7 @@ are separate commits and logged in AI_WORKFLOW.md.
 | D6 | PRs computed on read with covering index; summary table = scale-up path | Approved |
 | D7 | Stop for review after every milestone | Approved |
 | D8 | Extras: Swagger only (no CI workflow, no extra endpoints by default) | Decided by reviewer |
-| D9 | Read-only `GET /exercises?search=` | Rejected — catalog discoverable via Swagger docs + `UNKNOWN_EXERCISE` suggestions |
+| D9 | Read-only `GET /exercises?search=` | Rejected — catalog published in `docs/CATALOG.md` (kept in sync with the JSON by a test) + `UNKNOWN_EXERCISE` suggestions; muscle-group codes listed there and in the `UNKNOWN_MUSCLE_GROUP` message |
 | D10 (M6-A) | PR index: covering index `(user_id, exercise_id, performed_at, weight_kg, reps, volume_kg, e1rm_kg, id)` (set `id` added as the last key column); no metric-leading indexes | Approved 2026-10-07. Reasons: (1) every column the PR query reads, including the `id` tie-break, is in the index, so it is an Index Only Scan with no heap reads, faster than before in every measured case; (2) range queries (and so every compare query) stay ≤ 2 ms because the index is ordered by date; metric-leading indexes made the planner walk metric order for ranged queries, 10× slower (16–21 ms vs 1.9 ms) on skewed data, and Prisma cannot hint indexes; (3) no extra indexes, so no extra write cost per logged set (metric indexes would add 3); (4) the slow case (≈ 60 ms per metric) needs 50k entries of ONE exercise, unrealistic; a realistic 50k-entry user takes ≈ 2.6 ms per metric. Scale path: per-(user, exercise) PR summary table for all-time records (D6), ranges stay on this index. Measurements: section 8 |
 | D11 (M6-B/C/D) | PR endpoints: unknown exercise → 400 `UNKNOWN_EXERCISE` + suggestions; a period's record is the best set within that period; compare accepts `period` or four explicit bounds | Approved 2026-10-07 |
 | D12 | POST rejects a workout `date` more than 24 h after the server's now (`DATE_IN_FUTURE`). Workouts are logged after they happen; 24 h covers UTC+14 and device clock skew. Found during M6 verification: a typo year (2099) became a permanent all-time PR, and no endpoint can remove it. Alternative rejected: keep accepting future dates and cap PR queries at now (the bad row would remain in history) | Approved 2026-10-08 |
