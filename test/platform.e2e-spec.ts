@@ -1,5 +1,6 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
+import { weightUnits } from '../src/units/weight-units';
 import { createTestApp } from './support/create-app';
 import { errorBodyOf } from './support/types';
 
@@ -118,6 +119,28 @@ describe('Platform behaviour (e2e)', () => {
         .filter((p) => p.in === 'header' && p.name.toLowerCase() === 'idempotency-key')
         .map((p) => p.required ?? false);
       expect(headers).toEqual([false]);
+    });
+
+    it('lists the weight-unit registry as the unit enum everywhere (adding a unit is one entry, X1)', async () => {
+      const res = await request(app.getHttpServer()).get('/docs-json').expect(200);
+      const document = res.body as {
+        paths: Record<
+          string,
+          Record<string, { parameters?: { name: string; schema?: { enum?: string[] } }[] }>
+        >;
+        components: {
+          schemas: Record<string, { properties?: Record<string, { enum?: string[] }> }>;
+        };
+      };
+      const queryEnums = Object.values(document.paths)
+        .flatMap((operations) => Object.values(operations))
+        .flatMap((operation) => operation.parameters ?? [])
+        .filter((parameter) => parameter.name === 'unit')
+        .map((parameter) => parameter.schema?.enum);
+      const bodyEnum = document.components.schemas.WorkoutSetInputDto?.properties?.unit?.enum;
+
+      expect(queryEnums).toHaveLength(3); // history, records, compare
+      expect([...queryEnums, bodyEnum]).toEqual(Array(4).fill(weightUnits.codes()));
     });
   });
 });
