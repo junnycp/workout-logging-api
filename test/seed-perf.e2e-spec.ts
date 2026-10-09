@@ -106,6 +106,16 @@ describe('Performance dataset seed (integration)', () => {
     expect(await prisma.workoutEntry.count({ where: { userId: single } })).toBe(40);
   });
 
+  it('removes optional users again when a later seed leaves them out', async () => {
+    await seedPerfDataset(prisma, profile, { includeOptional: true });
+
+    const report = await seedPerfDataset(prisma, profile, { includeOptional: false });
+
+    expect(report.users).not.toContain(single);
+    expect(await prisma.workoutEntry.count({ where: { userId: single } })).toBe(0);
+    expect(await setCount(single)).toBe(0);
+  });
+
   it('produces data the API reads: history pages, plateau records and bodyweight-only messages', async () => {
     const server = app.getHttpServer();
     const page = await request(server).get(`/api/v1/users/${heavy}/workouts`).expect(200);
