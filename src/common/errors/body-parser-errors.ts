@@ -56,3 +56,24 @@ export function mapBodyParserErrors(
   }
   next(err);
 }
+
+/**
+ * Only JSON bodies are parsed. Any other body (text, form data) would leave the parsed body empty and come back as a
+ * list of missing fields; answer 415 instead. A request without a body is left to validation.
+ */
+export function requireJsonBody(req: Request, _res: Response, next: NextFunction): void {
+  // An empty body (Content-Length: 0) counts as no body, unlike in req.is().
+  const hasBody =
+    req.headers['transfer-encoding'] !== undefined ||
+    Number(req.headers['content-length'] ?? 0) > 0;
+  if (hasBody && !req.is('application/json')) {
+    return next(
+      new AppException(
+        HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+        ErrorCode.UNSUPPORTED_MEDIA_TYPE,
+        'Request body must be application/json',
+      ),
+    );
+  }
+  next();
+}
