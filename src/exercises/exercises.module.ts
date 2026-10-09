@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { ExerciseLookupService } from './exercise-lookup.service';
+import { ExerciseCatalogRepository } from './exercise-catalog.repository';
 
 @Module({
-  providers: [ExerciseLookupService],
-  exports: [ExerciseLookupService],
+  providers: [ExerciseCatalogRepository],
+  exports: [ExerciseCatalogRepository],
 })
 export class ExercisesModule {}

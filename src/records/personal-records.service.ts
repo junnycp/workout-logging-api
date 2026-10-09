@@ -4,7 +4,7 @@ import { DetailCode, ErrorCode, ErrorDetail } from '../common/errors/error-codes
 import { CLOCK, Clock } from '../common/time/clock';
 import { parseRangeQuery } from '../common/time/range-query';
 import { InstantRange, localDateOf, periodRanges } from '../common/time/time';
-import { ExerciseLookupService, ExerciseRef } from '../exercises/exercise-lookup.service';
+import { ExerciseCatalogRepository, ExerciseRef } from '../exercises/exercise-catalog.repository';
 import { normalizeExerciseName } from '../exercises/exercise-name';
 import { weightUnits } from '../units/weight-units';
 import { roundForResponse } from '../workouts/domain/set-metrics';
@@ -43,7 +43,7 @@ type Winners = Record<RecordMetric, RecordSetRow | null>;
 export class PersonalRecordsService {
   constructor(
     private readonly repository: PersonalRecordsRepository,
-    private readonly exercises: ExerciseLookupService,
+    private readonly exercises: ExerciseCatalogRepository,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 

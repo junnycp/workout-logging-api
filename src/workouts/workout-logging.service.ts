@@ -12,7 +12,7 @@ import {
   localDateOf,
   parseWorkoutDate,
 } from '../common/time/time';
-import { ExerciseLookupService, ExerciseRef } from '../exercises/exercise-lookup.service';
+import { ExerciseCatalogRepository, ExerciseRef } from '../exercises/exercise-catalog.repository';
 import { normalizeExerciseName } from '../exercises/exercise-name';
 import { weightUnits } from '../units/weight-units';
 import { computeSetMetrics, roundForResponse } from './domain/set-metrics';
@@ -50,7 +50,7 @@ interface ResolvedEntry {
 export class WorkoutLoggingService {
   constructor(
     private readonly repository: WorkoutsRepository,
-    private readonly exercises: ExerciseLookupService,
+    private readonly exercises: ExerciseCatalogRepository,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
