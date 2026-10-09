@@ -1,0 +1,129 @@
+{
+  "version": 1,
+  "seed": 20261009,
+  "anchor": "2026-10-01T00:00:00Z",
+  "spanDays": 1095,
+  "setsPerEntry": {
+    "min": 3,
+    "max": 6
+  },
+  "reps": {
+    "min": 1,
+    "max": 12
+  },
+  "lbShare": 0.15,
+  "bodyweightShare": 0.05,
+  "utcOffsetsMinutes": [
+    420,
+    0,
+    -300,
+    -240,
+    60,
+    540
+  ],
+  "users": [
+    {
+      "id": "perf-heavy",
+      "entries": 50000,
+      "exercises": [
+        "Bench Press",
+        "Back Squat",
+        "Deadlift",
+        "Overhead Press",
+        "Lat Pulldown",
+        "Romanian Deadlift",
+        "Incline Bench Press",
+        "Dumbbell Row",
+        "Leg Press",
+        "Barbell Curl",
+        "Triceps Pushdown",
+        "Seated Cable Row",
+        "Dumbbell Bench Press",
+        "Front Squat",
+        "Hip Thrust",
+        "Lateral Raise",
+        "Hammer Curl",
+        "Leg Extension",
+        "Lying Leg Curl",
+        "Standing Calf Raise",
+        "Skull Crusher",
+        "Face Pull",
+        "Incline Dumbbell Press",
+        "Bulgarian Split Squat",
+        "Arnold Press",
+        "Preacher Curl",
+        "Cable Crossover",
+        "T-Bar Row",
+        "Goblet Squat",
+        "Close-Grip Bench Press"
+      ],
+      "scenarios": {
+        "oldOnly": {
+          "exercise": "Sumo Deadlift",
+          "entries": 300,
+          "withinFirstDays": 180
+        },
+        "bodyweightOnly": {
+          "exercise": "Pull-Up",
+          "entries": 600
+        },
+        "plateau": {
+          "exercise": "Barbell Row",
+          "entries": 40,
+          "weight": 100,
+          "unit": "kg",
+          "reps": 5
+        },
+        "sameInstant": {
+          "exercise": "Bench Press",
+          "entries": 30
+        }
+      }
+    },
+    {
+      "id": "perf-bg",
+      "count": 50,
+      "entries": 2000,
+      "exercises": [
+        "Bench Press",
+        "Back Squat",
+        "Deadlift",
+        "Overhead Press",
+        "Lat Pulldown",
+        "Romanian Deadlift",
+        "Incline Bench Press",
+        "Dumbbell Row",
+        "Leg Press",
+        "Barbell Curl",
+        "Triceps Pushdown",
+        "Seated Cable Row",
+        "Dumbbell Bench Press",
+        "Front Squat",
+        "Hip Thrust",
+        "Lateral Raise",
+        "Hammer Curl",
+        "Leg Extension",
+        "Lying Leg Curl",
+        "Standing Calf Raise",
+        "Skull Crusher",
+        "Face Pull",
+        "Incline Dumbbell Press",
+        "Bulgarian Split Squat",
+        "Arnold Press",
+        "Preacher Curl",
+        "Cable Crossover",
+        "T-Bar Row",
+        "Goblet Squat",
+        "Close-Grip Bench Press"
+      ]
+    },
+    {
+      "id": "perf-single",
+      "entries": 50000,
+      "exercises": [
+        "Bench Press"
+      ],
+      "optional": true
+    }
+  ]
+}
