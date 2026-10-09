@@ -20,7 +20,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "postinstall": "prisma generate",
-    "seed": "npm run -s build && node dist/cli/seed-catalog.js"
+    "seed": "npm run -s build && node dist/cli/seed-catalog.js",
+    "seed:perf": "npm run -s build && node dist/cli/seed-perf.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.2",
