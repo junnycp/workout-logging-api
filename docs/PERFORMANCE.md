@@ -170,6 +170,10 @@ Batches of 20 parallel requests: history p50 29.6 / p95 73.1 ms; PRs (P2 variant
      candidate queries in parallel.
    - Batches of 20 records requests: p95 105.1 ms. Batches of 20 history requests: p95 73.1 ms.
    - Requests queue; none fails.
+   - The batches above use mid-size exercises. 20 simultaneous PR requests for the **most-logged** exercise
+     (Bench Press, 53k sets), measured by hand with curl (command output, 2026-10-09): p50 476 / p95 491 ms. Each
+     request scans 53k index tuples three times, so 20 of them saturate the 2 vCPUs. This is the strongest
+     argument for the PR summary table (D6) before scaling to many coaches.
    - At scale: a configurable pool size, PgBouncer in transaction mode, and read replicas for history and records.
 7. **Writes.**
    - One entry: p95 4.4 ms.
