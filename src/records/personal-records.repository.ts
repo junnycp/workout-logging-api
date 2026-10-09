@@ -38,9 +38,10 @@ export class PersonalRecordsRepository {
 
   /**
    * Ids of the sets tied on the highest stored value of one metric, the only sets that can hold the record
-   * (rounding to 4 decimals is monotonic); `pickRecord` then settles them on exact values. Usually one
-   * Index Only Scan of `workout_sets_pr_covering_idx` reading the top 50 (decision D10); only when all 50
-   * tie, a second query fetches every tied set. Weight 0 (bodyweight) never counts.
+   * (rounding to 4 decimals is monotonic); `pickRecord` then settles them on exact values. One Index Only
+   * Scan of `workout_sets_pr_covering_idx` reads the whole (user, exercise[, range]) slice and a top-N sort
+   * keeps the best 50 (decision D10: the index is ordered by date, not by metric, so the cost grows with the
+   * slice); only when all 50 tie, a second query fetches every tied set. Weight 0 (bodyweight) never counts.
    */
   async findRecordCandidates(scope: RecordScope, metric: RecordMetric): Promise<string[]> {
     const column = RANK_COLUMN[metric];

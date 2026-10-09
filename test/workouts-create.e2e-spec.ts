@@ -288,6 +288,71 @@ describe('POST /api/v1/users/:userId/workouts (e2e)', () => {
         { entries: [bench({ exerciseName: 'Underwater Basket Weaving' })] },
         { path: 'entries[0].exerciseName', code: 'UNKNOWN_EXERCISE' },
       ],
+      // Missing or null fields beyond the date (brief: "missing or malformed request fields").
+      ['an empty body', {}, { path: 'entries', code: 'IS_DEFINED' }],
+      ['a null entry', { entries: [null] }, { path: 'entries[0]', code: 'NESTED_VALIDATION' }],
+      [
+        'missing sets',
+        { entries: [{ exerciseName: 'Bench Press', date: '2026-10-01T18:30:00+07:00' }] },
+        { path: 'entries[0].sets', code: 'IS_DEFINED' },
+      ],
+      [
+        'null sets',
+        { entries: [bench({ sets: null })] },
+        { path: 'entries[0].sets', code: 'IS_DEFINED' },
+      ],
+      [
+        'a null set',
+        { entries: [bench({ sets: [null] })] },
+        { path: 'entries[0].sets[0]', code: 'NESTED_VALIDATION' },
+      ],
+      [
+        'null exercise name',
+        { entries: [bench({ exerciseName: null })] },
+        { path: 'entries[0].exerciseName', code: 'IS_DEFINED' },
+      ],
+      [
+        'missing weight',
+        { entries: [bench({ sets: [{ reps: 5, unit: 'kg' }] })] },
+        { path: 'entries[0].sets[0].weight', code: 'IS_DEFINED' },
+      ],
+      [
+        'null reps',
+        { entries: [bench({ sets: [{ reps: null, weight: 100, unit: 'kg' }] })] },
+        { path: 'entries[0].sets[0].reps', code: 'IS_DEFINED' },
+      ],
+      [
+        'missing unit',
+        { entries: [bench({ sets: [{ reps: 5, weight: 100 }] })] },
+        { path: 'entries[0].sets[0].unit', code: 'IS_DEFINED' },
+      ],
+      [
+        'an empty date string',
+        { entries: [bench({ date: '' })] },
+        { path: 'entries[0].date', code: 'INVALID_DATE' },
+      ],
+      // Units: the error points at the exact item, and codes are case-sensitive registry keys.
+      [
+        'an unsupported unit in a later entry and set',
+        {
+          entries: [
+            bench(),
+            bench({
+              sets: [
+                { reps: 5, weight: 100, unit: 'kg' },
+                { reps: 5, weight: 100, unit: 'kg' },
+                { reps: 5, weight: 100, unit: 'lbs' },
+              ],
+            }),
+          ],
+        },
+        { path: 'entries[1].sets[2].unit', code: 'UNSUPPORTED_UNIT' },
+      ],
+      [
+        'an upper-case unit code',
+        { entries: [bench({ sets: [{ reps: 5, weight: 100, unit: 'KG' }] })] },
+        { path: 'entries[0].sets[0].unit', code: 'UNSUPPORTED_UNIT' },
+      ],
     ];
 
     it.each(cases)('rejects %s', async (_case, body, expected) => {

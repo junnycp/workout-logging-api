@@ -17,9 +17,9 @@ export interface ExerciseDetails extends ExerciseRef {
 
 const MAX_SUGGESTIONS = 3;
 
-/** Resolves user-supplied exercise names against the closed catalog (D5). */
+/** Data access for the closed exercise catalog (D5): name resolution, suggestions, partial and muscle-group matches. */
 @Injectable()
-export class ExerciseLookupService {
+export class ExerciseCatalogRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   /**

@@ -193,6 +193,27 @@ describe('GET /api/v1/users/:userId/workouts (e2e)', () => {
       expect(all.data.every((e) => e.exercise.name !== 'Back Squat')).toBe(true);
     });
 
+    it('serves every entry of a date range exactly once, in the requested unit, across pages', async () => {
+      const userId = uniqueUserId();
+      await log(userId, [
+        ...Array.from({ length: 12 }, (_, i) =>
+          entry('Bench Press', `2026-09-${String(10 + i).padStart(2, '0')}T10:00:00Z`, 100, 'kg'),
+        ),
+        ...Array.from({ length: 8 }, () => entry('Back Squat', '2026-09-15T10:00:00Z', 225, 'lb')),
+        entry('Deadlift', '2026-08-31T10:00:00Z'),
+        entry('Deadlift', '2026-10-01T10:00:00Z'),
+      ]);
+      const query = { from: '2026-09-01', to: '2026-09-30', unit: 'lb', limit: 3 };
+
+      const { ids } = await walkPages(userId, query);
+      expect(ids).toHaveLength(20);
+      expect(new Set(ids).size).toBe(20);
+      const all = await historyBody(userId, { ...query, limit: 100 });
+      expect(ids).toEqual(all.data.map((e) => e.id));
+      expect(all.data.every((e) => e.sets.every((set) => set.unit === 'lb'))).toBe(true);
+      expect(all.data.map((e) => e.exercise.name)).not.toContain('Deadlift');
+    });
+
     it('rejects a cursor it did not issue', async () => {
       const res = await history(uniqueUserId(), { cursor: 'not-a-cursor' }).expect(400);
       expect(errorBodyOf(res).error.code).toBe('INVALID_CURSOR');
@@ -296,6 +317,25 @@ describe('GET /api/v1/users/:userId/workouts (e2e)', () => {
     it('treats a datetime bound as inclusive', async () => {
       expect((await historyBody(userId, { to: '2026-10-01T23:30:00Z' })).data).toHaveLength(1);
       expect((await historyBody(userId, { from: '2026-10-01T23:30:00.001Z' })).data).toEqual([]);
+    });
+
+    it('covers all 25 hours of a DST fall-back day (America/New_York, 2025-11-02)', async () => {
+      const dstUser = uniqueUserId();
+      await log(dstUser, [
+        entry('Bench Press', '2025-11-01T23:30:00-04:00'), // the day before: excluded
+        entry('Bench Press', '2025-11-02T00:30:00-04:00'), // first local hour, still daylight time
+        entry('Bench Press', '2025-11-02T23:30:00-05:00'), // last local hour, standard time
+        entry('Bench Press', '2025-11-03T00:30:00-05:00'), // the day after: excluded
+      ]);
+      const body = await historyBody(dstUser, {
+        from: '2025-11-02',
+        to: '2025-11-02',
+        tz: 'America/New_York',
+      });
+      expect(body.data.map((e) => e.performedAt)).toEqual([
+        '2025-11-03T04:30:00.000Z',
+        '2025-11-02T04:30:00.000Z',
+      ]);
     });
 
     it('rejects a range that ends before it starts', async () => {

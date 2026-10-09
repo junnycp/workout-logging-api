@@ -1,6 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
 import { AppException } from '../errors/app-exception';
-import { ErrorCode, ErrorDetail } from '../errors/error-codes';
+import { DetailCode, ErrorCode, ErrorDetail } from '../errors/error-codes';
 import { canonicalTimeZone, InstantRange, resolveDateRange } from './time';
 
 const BOUND_MESSAGES = {
@@ -27,7 +27,11 @@ export function parseRangeQuery(
   const timezone = canonicalTimeZone(tz ?? 'UTC');
   if (timezone === null) {
     throw validationError([
-      { path: 'tz', code: 'INVALID_TIMEZONE', message: 'tz is not a valid IANA time zone' },
+      {
+        path: 'tz',
+        code: DetailCode.INVALID_TIMEZONE,
+        message: 'tz is not a valid IANA time zone',
+      },
     ]);
   }
 
@@ -39,7 +43,10 @@ export function parseRangeQuery(
     ] as const) {
       if (value === undefined) continue;
       const parsed = resolveDateRange({ from: value }, timezone);
-      if (!parsed.ok && (parsed.error === 'INVALID_DATE' || parsed.error === 'MISSING_OFFSET')) {
+      if (
+        !parsed.ok &&
+        (parsed.error === DetailCode.INVALID_DATE || parsed.error === DetailCode.MISSING_OFFSET)
+      ) {
         details.push({
           path,
           code: parsed.error,

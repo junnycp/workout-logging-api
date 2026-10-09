@@ -2,7 +2,7 @@ import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { v7 as uuidv7 } from 'uuid';
 import { AppException } from '../common/errors/app-exception';
-import { ErrorCode, ErrorDetail } from '../common/errors/error-codes';
+import { DetailCode, ErrorCode, ErrorDetail } from '../common/errors/error-codes';
 import { requestHash } from '../common/idempotency/request-hash';
 import { CLOCK, Clock } from '../common/time/clock';
 import {
@@ -12,7 +12,7 @@ import {
   localDateOf,
   parseWorkoutDate,
 } from '../common/time/time';
-import { ExerciseLookupService, ExerciseRef } from '../exercises/exercise-lookup.service';
+import { ExerciseCatalogRepository, ExerciseRef } from '../exercises/exercise-catalog.repository';
 import { normalizeExerciseName } from '../exercises/exercise-name';
 import { weightUnits } from '../units/weight-units';
 import { computeSetMetrics, roundForResponse } from './domain/set-metrics';
@@ -50,7 +50,7 @@ interface ResolvedEntry {
 export class WorkoutLoggingService {
   constructor(
     private readonly repository: WorkoutsRepository,
-    private readonly exercises: ExerciseLookupService,
+    private readonly exercises: ExerciseCatalogRepository,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
@@ -115,7 +115,7 @@ export class WorkoutLoggingService {
       if (timezoneInvalid) {
         details.push({
           path: 'timezone',
-          code: 'INVALID_TIMEZONE',
+          code: DetailCode.INVALID_TIMEZONE,
           message: DATE_MESSAGES.INVALID_TIMEZONE,
         });
       }
@@ -133,7 +133,7 @@ export class WorkoutLoggingService {
       if (!exercise) {
         details.push({
           path: `entries[${index}].exerciseName`,
-          code: 'UNKNOWN_EXERCISE',
+          code: DetailCode.UNKNOWN_EXERCISE,
           message: `Unknown exercise '${entry.exerciseName}'`,
           suggestions: suggestions.get(nameKey) ?? [],
         });
@@ -152,7 +152,7 @@ export class WorkoutLoggingService {
       if (isTooFarInFuture(date.value.instant, now)) {
         details.push({
           path: `entries[${index}].date`,
-          code: 'DATE_IN_FUTURE',
+          code: DetailCode.DATE_IN_FUTURE,
           message: DATE_IN_FUTURE_MESSAGE,
         });
         return;

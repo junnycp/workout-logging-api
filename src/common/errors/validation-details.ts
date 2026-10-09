@@ -1,8 +1,9 @@
 import type { ValidationError } from 'class-validator';
 import type { ErrorDetail } from './error-codes';
+import { DetailCode } from './error-codes';
 
 const CONSTRAINT_CODE_OVERRIDES: Record<string, string> = {
-  whitelistValidation: 'UNKNOWN_FIELD',
+  whitelistValidation: DetailCode.UNKNOWN_FIELD,
 };
 
 const toUpperSnake = (name: string): string =>

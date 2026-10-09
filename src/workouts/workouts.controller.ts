@@ -15,13 +15,16 @@ import {
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiHeader,
+  ApiInternalServerErrorResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiPayloadTooLargeResponse,
   ApiTags,
+  ApiUnsupportedMediaTypeResponse,
 } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { AppException } from '../common/errors/app-exception';
-import { ErrorCode } from '../common/errors/error-codes';
+import { DetailCode, ErrorCode } from '../common/errors/error-codes';
 import { ErrorResponseDto } from '../common/openapi/error-response.dto';
 import { CreateWorkoutsDto, UserParamsDto } from './dto/create-workouts.dto';
 import { CreatedWorkoutsResponseDto } from './dto/created-workouts.dto';
@@ -32,6 +35,7 @@ import { WorkoutLoggingService } from './workout-logging.service';
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9_.:-]{1,128}$/;
 
 @ApiTags('workouts')
+@ApiInternalServerErrorResponse({ type: ErrorResponseDto, description: 'INTERNAL_ERROR' })
 @Controller('users/:userId/workouts')
 export class WorkoutsController {
   constructor(
@@ -49,7 +53,9 @@ export class WorkoutsController {
   @ApiOkResponse({ type: WorkoutHistoryResponseDto })
   @ApiBadRequestResponse({
     type: ErrorResponseDto,
-    description: 'VALIDATION_ERROR, INVALID_DATE_RANGE, INVALID_CURSOR or UNKNOWN_MUSCLE_GROUP',
+    description:
+      'VALIDATION_ERROR (details such as UNSUPPORTED_UNIT, INVALID_DATE, MISSING_OFFSET, INVALID_TIMEZONE, BLANK, ' +
+      'UNKNOWN_FIELD or a constraint such as MAX), INVALID_DATE_RANGE, INVALID_CURSOR or UNKNOWN_MUSCLE_GROUP',
   })
   history(
     @Param() { userId }: UserParamsDto,
@@ -80,9 +86,20 @@ export class WorkoutsController {
   })
   @ApiBadRequestResponse({
     type: ErrorResponseDto,
-    description: 'VALIDATION_ERROR or MALFORMED_JSON',
+    description:
+      'VALIDATION_ERROR (details such as UNSUPPORTED_UNIT, UNKNOWN_EXERCISE with suggestions, DATE_IN_FUTURE, ' +
+      'MISSING_OFFSET, MISSING_TIMEZONE, INVALID_DATE, INVALID_TIMEZONE, BLANK, UNKNOWN_FIELD or a constraint ' +
+      'such as MIN, IS_INT; a malformed userId gives MATCHES) or MALFORMED_JSON',
   })
   @ApiConflictResponse({ type: ErrorResponseDto, description: 'IDEMPOTENCY_KEY_REUSED' })
+  @ApiPayloadTooLargeResponse({
+    type: ErrorResponseDto,
+    description: 'PAYLOAD_TOO_LARGE (body over 1 MB)',
+  })
+  @ApiUnsupportedMediaTypeResponse({
+    type: ErrorResponseDto,
+    description: 'UNSUPPORTED_MEDIA_TYPE (body not application/json, or an unsupported encoding)',
+  })
   async create(
     @Param() { userId }: UserParamsDto,
     @Body() dto: CreateWorkoutsDto,
@@ -98,7 +115,7 @@ export class WorkoutsController {
         [
           {
             path: 'Idempotency-Key',
-            code: 'MATCHES',
+            code: DetailCode.MATCHES,
             message: 'Idempotency-Key must be 1-128 characters: letters, digits, _ . : -',
           },
         ],

@@ -1,5 +1,6 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
+import { weightUnits } from '../src/units/weight-units';
 import { createTestApp } from './support/create-app';
 import { errorBodyOf } from './support/types';
 
@@ -89,6 +90,26 @@ describe('Platform behaviour (e2e)', () => {
         .expect(415);
       expect(errorBodyOf(res).error.code).toBe('UNSUPPORTED_MEDIA_TYPE');
     });
+
+    it.each([
+      ['text/plain', 'hello'],
+      ['application/x-www-form-urlencoded', 'entries=1'],
+    ])('returns 415 for a %s body instead of reporting missing fields', async (type, body) => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/users/u1/workouts')
+        .set('content-type', type)
+        .send(body)
+        .expect(415);
+      expect(errorBodyOf(res).error).toMatchObject({
+        code: 'UNSUPPORTED_MEDIA_TYPE',
+        message: 'Request body must be application/json',
+      });
+    });
+
+    it('validates a POST without a body as an empty request, not as a media-type problem', async () => {
+      const res = await request(app.getHttpServer()).post('/api/v1/users/u1/workouts').expect(400);
+      expect(errorBodyOf(res).error.code).toBe('VALIDATION_ERROR');
+    });
   });
 
   describe('OpenAPI', () => {
@@ -118,6 +139,55 @@ describe('Platform behaviour (e2e)', () => {
         .filter((p) => p.in === 'header' && p.name.toLowerCase() === 'idempotency-key')
         .map((p) => p.required ?? false);
       expect(headers).toEqual([false]);
+    });
+
+    it('documents the error statuses of each API route, including 413, 415 and 500 on POST', async () => {
+      const res = await request(app.getHttpServer()).get('/docs-json').expect(200);
+      const paths = (res.body as { paths: Record<string, Record<string, { responses: object }>> })
+        .paths;
+      const statuses = (path: string, method: string) =>
+        Object.keys(paths[path]?.[method]?.responses ?? {}).sort();
+      expect(statuses('/api/v1/users/{userId}/workouts', 'post')).toEqual(
+        ['200', '201', '400', '409', '413', '415', '500'].sort(),
+      );
+      expect(statuses('/api/v1/users/{userId}/workouts', 'get')).toEqual(['200', '400', '500']);
+      expect(statuses('/api/v1/users/{userId}/personal-records', 'get')).toEqual([
+        '200',
+        '400',
+        '500',
+      ]);
+      expect(statuses('/api/v1/users/{userId}/personal-records/compare', 'get')).toEqual([
+        '200',
+        '400',
+        '500',
+      ]);
+    });
+
+    it('shows how long each request took in Swagger UI', async () => {
+      const res = await request(app.getHttpServer()).get('/docs/swagger-ui-init.js').expect(200);
+      expect(res.text).toMatch(/"displayRequestDuration":\s*true/);
+    });
+
+    it('lists the weight-unit registry as the unit enum everywhere (adding a unit is one entry, X1)', async () => {
+      const res = await request(app.getHttpServer()).get('/docs-json').expect(200);
+      const document = res.body as {
+        paths: Record<
+          string,
+          Record<string, { parameters?: { name: string; schema?: { enum?: string[] } }[] }>
+        >;
+        components: {
+          schemas: Record<string, { properties?: Record<string, { enum?: string[] }> }>;
+        };
+      };
+      const queryEnums = Object.values(document.paths)
+        .flatMap((operations) => Object.values(operations))
+        .flatMap((operation) => operation.parameters ?? [])
+        .filter((parameter) => parameter.name === 'unit')
+        .map((parameter) => parameter.schema?.enum);
+      const bodyEnum = document.components.schemas.WorkoutSetInputDto?.properties?.unit?.enum;
+
+      expect(queryEnums).toHaveLength(3); // history, records, compare
+      expect([...queryEnums, bodyEnum]).toEqual(Array(4).fill(weightUnits.codes()));
     });
   });
 });

@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsDefined, IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 import { IsWeightUnit } from '../../units/is-weight-unit.validator';
 import { WEIGHT_UNITS } from '../../units/weight-units';
+import { DetailCode } from '../../common/errors/error-codes';
 
 const UNIT_CODES = WEIGHT_UNITS.map((unit) => unit.code);
 export const PERIODS = ['week', 'month', 'year'] as const;
@@ -11,7 +12,7 @@ class RecordsBaseQueryDto {
   @IsDefined()
   @IsString()
   @MaxLength(100)
-  @Matches(/\S/, { message: 'exercise must not be blank', context: { code: 'BLANK' } })
+  @Matches(/\S/, { message: 'exercise must not be blank', context: { code: DetailCode.BLANK } })
   exercise!: string;
 
   @ApiPropertyOptional({ enum: UNIT_CODES, default: 'kg', description: 'Unit of every value.' })

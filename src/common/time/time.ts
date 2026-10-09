@@ -1,4 +1,5 @@
 import { DateTime, FixedOffsetZone, IANAZone } from 'luxon';
+import { DetailCode } from '../errors/error-codes';
 
 export type Result<T, E extends string> = { ok: true; value: T } | { ok: false; error: E };
 
@@ -6,7 +7,10 @@ const ok = <T>(value: T): { ok: true; value: T } => ({ ok: true, value });
 const fail = <E extends string>(error: E): { ok: false; error: E } => ({ ok: false, error });
 
 export type DateInputError =
-  'INVALID_DATE' | 'MISSING_OFFSET' | 'MISSING_TIMEZONE' | 'INVALID_TIMEZONE';
+  | typeof DetailCode.INVALID_DATE
+  | typeof DetailCode.MISSING_OFFSET
+  | typeof DetailCode.MISSING_TIMEZONE
+  | typeof DetailCode.INVALID_TIMEZONE;
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 // Strict ISO-8601 extended format: hours 00-23 (no "24:00"), upper-case T/Z, offset hours 00-23 and
@@ -54,19 +58,19 @@ type Instant = { instant: DateTime } & ({ kind: 'date' } | { kind: 'datetime' })
 
 function parseInstant(input: string, zone: string | undefined): Result<Instant, DateInputError> {
   if (DATE_ONLY.test(input)) {
-    if (zone === undefined) return fail('MISSING_TIMEZONE');
-    if (!isValidTimeZone(zone)) return fail('INVALID_TIMEZONE');
+    if (zone === undefined) return fail(DetailCode.MISSING_TIMEZONE);
+    if (!isValidTimeZone(zone)) return fail(DetailCode.INVALID_TIMEZONE);
     const start = startOfLocalDay(input, zone);
     return start && inYearRange(start)
       ? ok({ kind: 'date', instant: start })
-      : fail('INVALID_DATE');
+      : fail(DetailCode.INVALID_DATE);
   }
   const match = DATE_TIME.exec(input);
-  if (!match) return fail('INVALID_DATE');
-  if (!match.groups?.offset) return fail('MISSING_OFFSET');
+  if (!match) return fail(DetailCode.INVALID_DATE);
+  if (!match.groups?.offset) return fail(DetailCode.MISSING_OFFSET);
   const instant = DateTime.fromISO(input, { setZone: true });
   if (!instant.isValid || Math.abs(instant.offset) > MAX_OFFSET_MINUTES || !inYearRange(instant)) {
-    return fail('INVALID_DATE');
+    return fail(DetailCode.INVALID_DATE);
   }
   return ok({ kind: 'datetime', instant });
 }
@@ -103,7 +107,7 @@ export function resolveDateRange(
   range: { from?: string; to?: string },
   timezone: string,
 ): Result<InstantRange, DateInputError | 'INVALID_DATE_RANGE'> {
-  if (!isValidTimeZone(timezone)) return fail('INVALID_TIMEZONE');
+  if (!isValidTimeZone(timezone)) return fail(DetailCode.INVALID_TIMEZONE);
 
   let gte: DateTime | undefined;
   let lt: DateTime | undefined;

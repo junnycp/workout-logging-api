@@ -5,7 +5,10 @@ import { ErrorCode } from '../common/errors/error-codes';
 import { CursorPosition, decodeCursor, encodeCursor } from '../common/pagination/cursor';
 import { parseRangeQuery } from '../common/time/range-query';
 import { InstantRange, localDateOf } from '../common/time/time';
-import { ExerciseDetails, ExerciseLookupService } from '../exercises/exercise-lookup.service';
+import {
+  ExerciseDetails,
+  ExerciseCatalogRepository,
+} from '../exercises/exercise-catalog.repository';
 import { weightUnits } from '../units/weight-units';
 import { roundForResponse } from './domain/set-metrics';
 import {
@@ -22,7 +25,7 @@ export const EMPTY_HISTORY_MESSAGE = 'No workouts found for the given filters.';
 export class WorkoutHistoryService {
   constructor(
     private readonly repository: WorkoutHistoryRepository,
-    private readonly exercises: ExerciseLookupService,
+    private readonly exercises: ExerciseCatalogRepository,
   ) {}
 
   async history(userId: string, query: WorkoutHistoryQueryDto): Promise<WorkoutHistoryResponseDto> {

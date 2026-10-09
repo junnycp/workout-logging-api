@@ -1,5 +1,11 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
-import { ApiBadRequestResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBadRequestResponse,
+  ApiInternalServerErrorResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ErrorResponseDto } from '../common/openapi/error-response.dto';
 import { UserParamsDto } from '../workouts/dto/create-workouts.dto';
 import {
@@ -11,6 +17,7 @@ import {
 import { PersonalRecordsService } from './personal-records.service';
 
 @ApiTags('personal-records')
+@ApiInternalServerErrorResponse({ type: ErrorResponseDto, description: 'INTERNAL_ERROR' })
 @Controller('users/:userId/personal-records')
 export class PersonalRecordsController {
   constructor(private readonly records: PersonalRecordsService) {}
@@ -25,7 +32,9 @@ export class PersonalRecordsController {
   @ApiOkResponse({ type: PersonalRecordsResponseDto })
   @ApiBadRequestResponse({
     type: ErrorResponseDto,
-    description: 'VALIDATION_ERROR (incl. UNKNOWN_EXERCISE with suggestions) or INVALID_DATE_RANGE',
+    description:
+      'VALIDATION_ERROR (details such as UNKNOWN_EXERCISE with suggestions, UNSUPPORTED_UNIT, INVALID_DATE, ' +
+      'MISSING_OFFSET, INVALID_TIMEZONE, BLANK, UNKNOWN_FIELD) or INVALID_DATE_RANGE',
   })
   personalRecords(
     @Param() { userId }: UserParamsDto,
@@ -44,7 +53,9 @@ export class PersonalRecordsController {
   @ApiOkResponse({ type: CompareRecordsResponseDto })
   @ApiBadRequestResponse({
     type: ErrorResponseDto,
-    description: 'VALIDATION_ERROR (incl. UNKNOWN_EXERCISE) or INVALID_DATE_RANGE',
+    description:
+      'VALIDATION_ERROR (details such as UNKNOWN_EXERCISE with suggestions, UNSUPPORTED_UNIT, INVALID_DATE, ' +
+      'MISSING_OFFSET, INVALID_TIMEZONE, REQUIRED or CONFLICT for period vs bounds) or INVALID_DATE_RANGE',
   })
   compare(
     @Param() { userId }: UserParamsDto,

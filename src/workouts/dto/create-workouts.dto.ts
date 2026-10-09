@@ -18,6 +18,7 @@ import {
 import { MaxDecimalPlaces } from '../../common/validation/max-decimal-places.validator';
 import { IsWeightUnit } from '../../units/is-weight-unit.validator';
 import { WEIGHT_UNITS } from '../../units/weight-units';
+import { DetailCode } from '../../common/errors/error-codes';
 
 export const MAX_ENTRIES_PER_REQUEST = 100;
 export const MAX_SETS_PER_ENTRY = 50;
@@ -54,7 +55,7 @@ export class WorkoutEntryInputDto {
   @IsDefined()
   @IsString()
   @MaxLength(100)
-  @Matches(/\S/, { message: 'exerciseName must not be blank', context: { code: 'BLANK' } })
+  @Matches(/\S/, { message: 'exerciseName must not be blank', context: { code: DetailCode.BLANK } })
   exerciseName!: string;
 
   @ApiProperty({

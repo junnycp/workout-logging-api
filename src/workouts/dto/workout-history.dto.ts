@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import { IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { IsWeightUnit } from '../../units/is-weight-unit.validator';
 import { WEIGHT_UNITS } from '../../units/weight-units';
+import { DetailCode } from '../../common/errors/error-codes';
 
 export const DEFAULT_HISTORY_LIMIT = 20;
 export const MAX_HISTORY_LIMIT = 100;
@@ -15,7 +16,7 @@ export class WorkoutHistoryQueryDto {
   @IsOptional()
   @IsString()
   @MaxLength(100)
-  @Matches(/\S/, { message: 'exercise must not be blank', context: { code: 'BLANK' } })
+  @Matches(/\S/, { message: 'exercise must not be blank', context: { code: DetailCode.BLANK } })
   exercise?: string;
 
   @ApiPropertyOptional({
