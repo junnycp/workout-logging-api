@@ -517,7 +517,7 @@ What would change, in order of impact:
 ## 11. Testing
 
 ```bash
-npm test            # unit: 222 tests: domain math, units, time/DST, PR ranking, validators, error mapping, perf tooling
+npm test            # unit: 223 tests: domain math, units, time/DST, PR ranking, validators, error mapping, perf tooling
 npm run test:e2e    # integration: 152 tests against PostgreSQL 16 in Testcontainers (real migrations, real catalog)
 ```
 
