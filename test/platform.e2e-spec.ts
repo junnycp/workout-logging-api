@@ -141,7 +141,7 @@ describe('Platform behaviour (e2e)', () => {
       expect(headers).toEqual([false]);
     });
 
-    it('documents every error status each API route can return', async () => {
+    it('documents the error statuses of each API route, including 413, 415 and 500 on POST', async () => {
       const res = await request(app.getHttpServer()).get('/docs-json').expect(200);
       const paths = (res.body as { paths: Record<string, Record<string, { responses: object }>> })
         .paths;

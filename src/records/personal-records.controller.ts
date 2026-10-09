@@ -33,7 +33,7 @@ export class PersonalRecordsController {
   @ApiBadRequestResponse({
     type: ErrorResponseDto,
     description:
-      'VALIDATION_ERROR (details: UNKNOWN_EXERCISE with suggestions, UNSUPPORTED_UNIT, INVALID_DATE, ' +
+      'VALIDATION_ERROR (details such as UNKNOWN_EXERCISE with suggestions, UNSUPPORTED_UNIT, INVALID_DATE, ' +
       'MISSING_OFFSET, INVALID_TIMEZONE, BLANK, UNKNOWN_FIELD) or INVALID_DATE_RANGE',
   })
   personalRecords(
@@ -54,7 +54,7 @@ export class PersonalRecordsController {
   @ApiBadRequestResponse({
     type: ErrorResponseDto,
     description:
-      'VALIDATION_ERROR (details: UNKNOWN_EXERCISE with suggestions, UNSUPPORTED_UNIT, INVALID_DATE, ' +
+      'VALIDATION_ERROR (details such as UNKNOWN_EXERCISE with suggestions, UNSUPPORTED_UNIT, INVALID_DATE, ' +
       'MISSING_OFFSET, INVALID_TIMEZONE, REQUIRED or CONFLICT for period vs bounds) or INVALID_DATE_RANGE',
   })
   compare(

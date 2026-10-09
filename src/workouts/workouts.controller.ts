@@ -54,7 +54,7 @@ export class WorkoutsController {
   @ApiBadRequestResponse({
     type: ErrorResponseDto,
     description:
-      'VALIDATION_ERROR (details: UNSUPPORTED_UNIT, INVALID_DATE, MISSING_OFFSET, INVALID_TIMEZONE, BLANK, ' +
+      'VALIDATION_ERROR (details such as UNSUPPORTED_UNIT, INVALID_DATE, MISSING_OFFSET, INVALID_TIMEZONE, BLANK, ' +
       'UNKNOWN_FIELD or a constraint such as MAX), INVALID_DATE_RANGE, INVALID_CURSOR or UNKNOWN_MUSCLE_GROUP',
   })
   history(
@@ -87,9 +87,9 @@ export class WorkoutsController {
   @ApiBadRequestResponse({
     type: ErrorResponseDto,
     description:
-      'VALIDATION_ERROR (details: UNSUPPORTED_UNIT, UNKNOWN_EXERCISE with suggestions, DATE_IN_FUTURE, ' +
+      'VALIDATION_ERROR (details such as UNSUPPORTED_UNIT, UNKNOWN_EXERCISE with suggestions, DATE_IN_FUTURE, ' +
       'MISSING_OFFSET, MISSING_TIMEZONE, INVALID_DATE, INVALID_TIMEZONE, BLANK, UNKNOWN_FIELD or a constraint ' +
-      'such as MIN, IS_INT) or MALFORMED_JSON',
+      'such as MIN, IS_INT; a malformed userId gives MATCHES) or MALFORMED_JSON',
   })
   @ApiConflictResponse({ type: ErrorResponseDto, description: 'IDEMPOTENCY_KEY_REUSED' })
   @ApiPayloadTooLargeResponse({
