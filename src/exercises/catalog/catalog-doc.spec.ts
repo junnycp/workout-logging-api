@@ -3,7 +3,12 @@ import { join } from 'node:path';
 
 interface CatalogFile {
   muscleGroups: { code: string }[];
-  exercises: { name: string; aliases?: string[] }[];
+  exercises: {
+    name: string;
+    aliases?: string[];
+    primaryMuscles: string[];
+    secondaryMuscles?: string[];
+  }[];
 }
 
 const root = join(__dirname, '..', '..', '..');
@@ -13,16 +18,16 @@ const catalog = JSON.parse(
 const doc = readFileSync(join(root, 'docs/CATALOG.md'), 'utf8');
 
 describe('docs/CATALOG.md', () => {
-  it('lists every exercise of the catalog with its aliases, one row each', () => {
+  it('has exactly one row per exercise, with its aliases and muscles as in the JSON', () => {
+    const dash = (items: string[] | undefined) => (items?.length ? items.join(', ') : '–');
+    const expected = catalog.exercises.map(
+      (e) =>
+        `| ${e.name} | ${dash(e.aliases)} | ${e.primaryMuscles.join(', ')} | ${dash(e.secondaryMuscles)} |`,
+    );
     const rows = doc
       .split('\n')
       .filter((line) => line.startsWith('| ') && !line.startsWith('| Exercise'));
-    expect(rows).toHaveLength(catalog.exercises.length);
-    for (const exercise of catalog.exercises) {
-      const row = rows.find((line) => line.startsWith(`| ${exercise.name} |`));
-      expect(row).toBeDefined();
-      for (const alias of exercise.aliases ?? []) expect(row).toContain(alias);
-    }
+    expect(rows).toEqual(expected);
   });
 
   it('lists every muscle-group code', () => {
