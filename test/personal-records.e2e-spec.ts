@@ -174,6 +174,29 @@ describe('Personal records (e2e)', () => {
       }).expect(400);
       expect(errorBodyOf(res).error.code).toBe('INVALID_DATE_RANGE');
     });
+
+    it.each([
+      ['an unsupported unit', { unit: 'stone' }, { path: 'unit', code: 'UNSUPPORTED_UNIT' }],
+      ['an unknown time zone', { tz: 'Mars/Base' }, { path: 'tz', code: 'INVALID_TIMEZONE' }],
+      ['an impossible date', { from: '2026-13-01' }, { path: 'from', code: 'INVALID_DATE' }],
+      [
+        'a datetime without an offset',
+        { to: '2026-09-01T10:00:00' },
+        { path: 'to', code: 'MISSING_OFFSET' },
+      ],
+    ])('rejects %s', async (_case, query, expected) => {
+      const res = await records(userId, { exercise: 'Bench Press', ...query }).expect(400);
+      const { error } = errorBodyOf(res);
+      expect(error.code).toBe('VALIDATION_ERROR');
+      expect(error.details).toEqual([expect.objectContaining(expected)]);
+    });
+
+    it('rejects a malformed user id', async () => {
+      const res = await records('bad.id', { exercise: 'Bench Press' }).expect(400);
+      expect(errorBodyOf(res).error.details).toEqual([
+        expect.objectContaining({ path: 'userId', code: 'MATCHES' }),
+      ]);
+    });
   });
 
   describe('ranking and tie-breaking (decision D4)', () => {
@@ -420,6 +443,32 @@ describe('Personal records (e2e)', () => {
       const { error } = errorBodyOf(res);
       expect(error.code).toBe('VALIDATION_ERROR');
       expect(error.details).toEqual(expect.arrayContaining([expect.objectContaining({ path })]));
+    });
+
+    it.each([
+      [
+        'an unsupported unit',
+        { period: 'month', unit: 'stone' },
+        { path: 'unit', code: 'UNSUPPORTED_UNIT' },
+      ],
+      [
+        'an unknown time zone',
+        { period: 'month', tz: 'Mars/Base' },
+        { path: 'tz', code: 'INVALID_TIMEZONE' },
+      ],
+      [
+        'an explicit bound without an offset',
+        {
+          currentFrom: '2026-09-01',
+          currentTo: '2026-09-30',
+          previousFrom: '2026-08-01T00:00:00',
+          previousTo: '2026-08-31',
+        },
+        { path: 'previousFrom', code: 'MISSING_OFFSET' },
+      ],
+    ])('reports %s at its parameter', async (_case, query, expected) => {
+      const res = await compare(userId, { exercise: 'Bench Press', ...query }).expect(400);
+      expect(errorBodyOf(res).error.details).toEqual([expect.objectContaining(expected)]);
     });
 
     it('rejects an inverted explicit range', async () => {
