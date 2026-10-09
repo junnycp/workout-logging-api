@@ -15,7 +15,7 @@ Every requirement gets an ID; tests and README sections reference these IDs.
 | R1.2 | Units kg, lb | Unit registry (`src/units/weight-units.ts`) | weight-units.spec: "supports kg and lb by default" |
 | R1.3 | Store original + normalized kg | `workout_sets.weight`, `unit`, `weight_kg` | workouts-create: same as R1.1, "rounds the response kg from the exact conversion…"; set-metrics.spec |
 | R1.4 | Bulk: multiple exercises per request | `entries[]` in one transaction | workouts-create: "accepts the maximum payload: 100 entries of 50 sets", "reports problems in several entries at once and stores none of the valid ones" |
-| R2.1 | History for a user | `GET /users/:userId/workouts` | workouts-history: "returns entries newest first…", "never returns another user's entries" |
+| R2.1 | History for a user | `GET /users/:userId/workouts` | workouts-history: "returns entries newest first…", "never returns another user’s entries" |
 | R2.2 | Filter: exercise name, partial match | `exercise` query, `exercise_names` + trigram index | workouts-history: "matches part of a name, case-insensitively", "matches aliases"; catalog-sync: "serves partial name matches from the trigram index" |
 | R2.3 | Filter: date range | `from`, `to`, `tz` | workouts-history: "reads date-only bounds as whole days in the requested time zone", "treats a datetime bound as inclusive", "covers all 25 hours of a DST fall-back day" |
 | R2.4 | Filter: muscle group (if metadata exists) | `muscleGroup`, catalog mapping tables | workouts-history: "filters by muscle group, including secondary muscles", "rejects an unknown muscle group…" |
@@ -26,7 +26,7 @@ Every requirement gets an ID; tests and README sections reference these IDs.
 | R3.3 | PR: best Epley 1RM = weight × (1 + reps/30) | `bestEstimated1RM` | set-metrics.spec: "applies the formula literally at 1 rep…"; personal-records: "picks 100 kg × 1 over 96 kg × 2…" |
 | R3.4 | Date each PR was achieved | `achievedAt` + `localDate` on each PR | personal-records: "returns each record with the set and the date it was achieved"; tie-breaks: "prefers the earliest date when value and reps tie" |
 | R3.5 | Compare PRs across ranges (this month vs last month) | `GET .../personal-records/compare` | personal-records: "compares this month to date with last month, in the requested time zone", "compares two explicit ranges…" |
-| E1 | Invalid/unsupported unit | 400 `VALIDATION_ERROR`, detail `UNSUPPORTED_UNIT` | workouts-create: "rejects unsupported unit", "rejects an unsupported unit in a later entry and set"; records/compare: "rejects an unsupported unit" |
+| E1 | Invalid/unsupported unit | 400 `VALIDATION_ERROR`, detail `UNSUPPORTED_UNIT` | workouts-create: "rejects unsupported unit", "rejects an unsupported unit in a later entry and set"; records: "rejects an unsupported unit"; compare: "reports an unsupported unit at its parameter" |
 | E2 | Missing/malformed fields (null date, negative weight/reps, empty sets) | DTO validation, field paths in `details` | workouts-create: 39-case table ("rejects null date", "rejects negative weight", "rejects empty sets array", "rejects null sets", …) |
 | E3 | Empty date range → empty result + message, not error | 200, `data: []` / null records, `meta.message` | workouts-history "reads date-only bounds…" (empty UTC case); personal-records: "returns null records with a message when the range has no sets", "adds a message when neither period has sets" |
 | E4 | Timezone strategy documented | UTC storage + request `tz` (Section 6, README §7) | time.spec (23/25-hour DST days, Santiago skipped midnight, month boundaries across DST); session-timezone e2e |
@@ -444,7 +444,7 @@ are separate commits and logged in AI_WORKFLOW.md.
 - `AI_WORKFLOW.md` sections: Tools & purposes · Prompting strategy · Corrections log (wrong/suboptimal) ·
   Rejected suggestions · Line-by-line explanation candidate (likely the keyset pagination query or the
   idempotency transaction).
-- Only real events are logged (C1–C26 in AI_WORKFLOW.md); the line-by-line piece is `WorkoutHistoryRepository.findPage`.
+- Only real events are logged (C1–C27 in AI_WORKFLOW.md); the line-by-line piece is `WorkoutHistoryRepository.findPage`.
 
 ## 13. Decisions
 

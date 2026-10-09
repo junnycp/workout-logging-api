@@ -10,7 +10,7 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
 - **Strategy.** A rules file (`CLAUDE.md`), then plans with numbered decisions before code. Spikes on a real
   Postgres decided questions instead of model memory. Tests came first for the domain logic, correction commits are
   separate, and an independent review ran before every merge. §2 shows how the rules changed after mistakes.
-- **26 corrections** where AI output was wrong or suboptimal (§3). The most instructive:
+- **27 corrections** where AI output was wrong or suboptimal (§3). The most instructive:
   - C17: stored instants were shifted by the database session time zone.
   - C21: PRs were ranked on rounded values.
   - C22: future-dated logs became permanent PRs.
@@ -31,7 +31,7 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
 | Claude Code (Claude Opus 5.5, VS Code extension) | Requirement analysis, architecture/plan drafting, verification spikes, environment setup, implementation, tests, documentation |
 | `technical-leader` subagent (`.claude/agents/technical-leader.md`) | Senior-engineer persona for design decisions, TDD implementation and diff review |
 | Official docs fetched by the agent (code.claude.com, docs.nestjs.com, prisma.io, orm.drizzle.team, PostgreSQL, Wikipedia for the 1RM definition) | Grounding claims instead of relying on model memory |
-| Fresh `technical-leader` review agents | One per plan and per milestone, plus a final whole-repository review (M8): read-only, they ran spikes on throwaway databases and reported findings that I then had fixed (C12, C13, C17, C21, C23–C26) |
+| Fresh `technical-leader` review agents | One per plan and per milestone, plus a final whole-repository review (M8): read-only, they ran spikes on throwaway databases and reported findings that I then had fixed (C12, C13, C17, C21, C23–C27) |
 | Spikes run by the agent (Testcontainers, a scratch Postgres, `auto_explain`, `EXPLAIN ANALYZE`) | Settling technical questions with measurements: Prisma capabilities (D1), pagination cost (C3), index choice (D10), performance evidence (M7) |
 
 ## 2. Prompting strategy
@@ -419,11 +419,11 @@ Later changes to `CLAUDE.md`, each from its git history:
 - **Outcome:** Plan rev. 2:
   - The prompting-strategy history is built only from the CLAUDE.md git log, with a hash for every rule.
   - Only committed figures are used, or a figure is marked as command output.
-  - The runner is kept as `plan/m7-run.sh`.
+  - The runner is kept locally as `plan/m7-run.sh` (`plan/` is git-ignored).
   - The `resolve` change is dropped.
 - **Commit:** none yet (plan stage).
 
-### C26 — Final whole-repo review: personal data in access logs and four smaller defects (2026-10-09, M8 review)
+### C26 — Final whole-repo review: personal data in access logs and seven smaller defects (2026-10-09, M8 review)
 - **AI output:** Code written in earlier milestones that passed every test and every per-milestone review:
   - **Personal data in the access log.** M1 relied on pino-http's default request serializer and redacted only
     `authorization` and `cookie`. Every access line still held the client IP, user agent, X-Forwarded-For and
@@ -436,18 +436,52 @@ Later changes to `CLAUDE.md`, each from its git history:
     CLAUDE.md says codes live in `error-codes.ts`.
   - **A repository named as a service.** `ExerciseLookupService` queried Prisma directly, breaking the
     service/repository layering.
+  - **Incomplete OpenAPI.** POST did not document 413 and 415, and no route documented 500.
+  - **A port clash.** `docker compose up` failed on machines where 5432 or 3000 was already taken.
+  - **An undocumented catalog.** D9 rejected a catalog endpoint because the valid names would be documented, but
+    they were only in the seed JSON.
 - **How detected:** For M8 I asked for a timeboxed review of the whole repository, not a diff, by the
   `technical-leader` subagent.
   - It read `pino-std-serializers` to see what the default serializer logs; I confirmed this on a container log
     line.
   - It inferred the 415 gap from the parser setup; I confirmed it with curl.
-- **Outcome:** Test-first fixes, each in its own commit:
+- **Outcome:** Each fix in its own commit, test first where behaviour changed:
   - Access logs keep only the request id, method and URL.
   - A body that is not JSON gets 415; a request without a body is still validated.
+  - OpenAPI documents 413, 415 and 500.
   - The comment now describes what the scan really does.
   - A `DetailCode` list was added, and the repository was renamed.
+  - The compose host ports can be overridden.
+  - The catalog is published in `docs/CATALOG.md`, with a sync test.
   - Findings outside the M8 scope are listed as follow-ups in the README.
-- **Commit:** `a0682b8` + `14a4a22` (logging), `36fd5f4` + `065d905` (415), `cf32708`, `50ed9f0`, `d3b2526`.
+- **Commit:** `a0682b8` + `14a4a22` (logging), `36fd5f4` + `065d905` (415), `1d1a619` + `775c2e2` (OpenAPI),
+  `cf32708`, `50ed9f0`, `d3b2526`, `2eaa34a`, `77223f2`.
+
+### C27 — M8 documents and tests that claimed more than they showed (2026-10-09, M8 review)
+- **AI output:** The first M8 drafts had these problems:
+  - **A wrong capacity formula.** The README estimated throughput as concurrency ÷ p50 of the latency batches. The
+    batches are closed loops that last as long as their slowest request, so history came out ~2.5× too high
+    (675 instead of ~260 requests/s).
+  - **Inaccurate examples.**
+    - A validation paragraph referred to problems its example did not contain.
+    - A compare example showed explicit-bounds output under a `period` description.
+  - **Two tests weaker than their commit messages claimed.**
+    - The catalog sync test ignored the muscle columns.
+    - The access-log test checked the serializer but not that the logger used it.
+  - **Overstated wording.**
+    - The OpenAPI descriptions claimed to list every detail code.
+    - C26 described fewer findings than the branch fixed.
+- **How detected:** The independent `technical-leader` review of the M8 branch.
+  - It checked every number, hash and test name in the new documents against the repository.
+  - It compared the README with the live API and `/docs-json`.
+  - It read `perf-latency.ts` to see how the batches are measured.
+- **Outcome:**
+  - The estimate now uses 20 ÷ the slowest latency, with the per-coach request rate as a labelled assumption.
+  - The examples were corrected.
+  - The tests were strengthened. Each was shown to fail on the drift it guards against: editing a muscle in
+    `CATALOG.md`, or removing the serializer.
+  - The wording was fixed.
+- **Commit:** `8ce2c3b`, `a355dc0`, `b26a428`, `afc9419`, and this entry.
 
 ## 4. Rejected AI suggestions
 
@@ -480,9 +514,9 @@ took 5.8 ms ("Rows Removed by Filter: 49000"), against 0.056 ms for a row-compar
 |---|---|---|
 | 46 | ``conditions = [Prisma.sql`e.user_id = ${query.userId}`]`` | Every condition is a `Prisma.sql` fragment, so values are bind parameters (`$1`), never string-concatenated. The list starts with the user, the leading column of both history indexes |
 | 47–50 | `e.performed_at >= ${gte}::timestamptz`, `< ${lt}` | The date range as a half-open UTC interval `[gte, lt)`, already resolved from `from`/`to`/`tz` by the service. The adapter sends JS Dates without an offset, so they are read correctly only because the session is pinned to UTC. C17: on a server whose default zone was Asia/Ho_Chi_Minh, `10:00Z` was stored as `03:00Z` and bounds were read 7 hours off. Reads shifted back the same way, so the API looked right and every test passed |
-| 51–54 | `(e.performed_at, e.id) < (${after.performedAt}, ${after.id})` | The keyset cursor. A **row comparison** continues strictly after the last row of the previous page in `(performed_at DESC, id DESC)` order. `id` breaks ties between entries with the same instant, so no entry is skipped or repeated. Postgres uses it as an index condition, so the scan starts at the cursor: the cost is the page size, not the depth |
+| 51–54 | `(e.performed_at, e.id) < (${query.after.performedAt}::timestamptz, ${query.after.id}::uuid)` | The keyset cursor. A **row comparison** continues strictly after the last row of the previous page in `(performed_at DESC, id DESC)` order. `id` breaks ties between entries with the same instant, so no entry is skipped or repeated. Postgres uses it as an index condition, so the scan starts at the cursor: the cost is the page size, not the depth |
 | 56–57 | `columns` | Only the four columns the service needs, aliased to camelCase for the TypeScript row type |
-| 59–65 | No exercise filter | One index scan of `(user_id, performed_at DESC, id DESC)` in index order, stopped by `LIMIT ${take}`. The service passes `take = limit + 1`: an extra row means `hasMore` (`workout-history.service.ts` lines 47–49) without a `COUNT(*)` |
+| 59–65 | No exercise filter | Served by `(user_id, performed_at DESC, id DESC)` and stopped by `LIMIT ${take}`: usually an Index Scan in index order; for a deep cursor the planner may pick a Bitmap scan of the same index plus a sort of the ~20 matching rows (`docs/perf/plans/warm/H2-history-deep-cursor.txt`), which reads the same few rows. The service passes `take = limit + 1`: an extra row means `hasMore` (`workout-history.service.ts` lines 47–49) without a `COUNT(*)` |
 | 67–69 | `unnest(${exerciseIds}::uuid[]) AS x(exercise_id)` | With a name or muscle-group filter, the service has already resolved the exercise ids (and returned an empty page itself when there are none, so the array is never empty here). `unnest` turns the array parameter into rows: one per exercise |
 | 70–76 | `CROSS JOIN LATERAL (… WHERE e.exercise_id = x.exercise_id AND <conditions> … LIMIT ${take})` | For **each** exercise, the newest `take` matching rows from `(user_id, exercise_id, performed_at DESC, id DESC)`. The user, range and cursor conditions are repeated **inside** each subquery so every per-exercise scan starts at the cursor and stops after `take` rows (decision M5-A). The rejected alternative, `exercise_id = ANY(…)` on the user index, walked the user's whole timeline and skipped about 21k rows when the exercise was only logged long ago |
 | 77–78 | `ORDER BY p."performedAt" DESC, p.id DESC LIMIT ${take}` | Merges the per-exercise lists: at most `ids × take` rows are sorted, and the newest `take` win. The outer order must repeat the inner one exactly, or the cursor of the next page would not match |

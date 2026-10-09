@@ -11,7 +11,7 @@ AI-first workflow; see [AI_WORKFLOW.md](AI_WORKFLOW.md).
 | [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | Measurements on 50,000 entries per user, query plans, known limits |
 | [docs/CATALOG.md](docs/CATALOG.md) | The 57 accepted exercises, their aliases and muscle groups |
 | [docs/ESTIMATION.md](docs/ESTIMATION.md) | Time estimate, written before any code (commit `a68da97`, 2026-10-02) and its revisions |
-| [AI_WORKFLOW.md](AI_WORKFLOW.md) | How AI was used, 26 logged corrections, rejected suggestions |
+| [AI_WORKFLOW.md](AI_WORKFLOW.md) | How AI was used, 27 logged corrections, rejected suggestions |
 | Swagger UI | `http://localhost:3000/docs` (OpenAPI JSON at `/docs-json`) |
 
 ## 1. Quick start
