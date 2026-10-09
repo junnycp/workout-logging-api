@@ -5,8 +5,8 @@ import { markdownTable, parseAutoExplain, percentile, summarize, truncate } from
  * captured in (auto_explain, PG16): the maxWeight candidate query of the most-logged exercise.
  */
 const PR_NOTICE = `duration: 30.746 ms  plan:
-Query Text: SELECT "public"."workout_sets"."id", "public"."workout_sets"."weight_kg", "public"."workout_sets"."volume_kg", "public"."workout_sets"."e1rm_kg" FROM "public"."workout_sets" WHERE ("public"."workout_sets"."user_id" = \$1 AND "public"."workout_sets"."exercise_id" = \$2 AND "public"."workout_sets"."weight_kg" > \$3) ORDER BY "public"."workout_sets"."weight_kg" DESC, "public"."workout_sets"."reps" DESC, "public"."workout_sets"."performed_at" ASC, "public"."workout_sets"."id" ASC LIMIT \$4 OFFSET \$5
-Query Parameters: \$1 = 'perf-heavy', \$2 = '01a11ad8-161d-743b-a69d-25c64cfff473', \$3 = '0', \$4 = '50', \$5 = '0'
+Query Text: SELECT "public"."workout_sets"."id", "public"."workout_sets"."weight_kg", "public"."workout_sets"."volume_kg", "public"."workout_sets"."e1rm_kg" FROM "public"."workout_sets" WHERE ("public"."workout_sets"."user_id" = $1 AND "public"."workout_sets"."exercise_id" = $2 AND "public"."workout_sets"."weight_kg" > $3) ORDER BY "public"."workout_sets"."weight_kg" DESC, "public"."workout_sets"."reps" DESC, "public"."workout_sets"."performed_at" ASC, "public"."workout_sets"."id" ASC LIMIT $4 OFFSET $5
+Query Parameters: $1 = 'perf-heavy', $2 = '01a11ad8-161d-743b-a69d-25c64cfff473', $3 = '0', $4 = '50', $5 = '0'
 Limit  (cost=24247.99..24253.82 rows=50 width=44) (actual time=28.048..30.725 rows=50 loops=1)
   Buffers: shared hit=1463
   ->  Gather Merge  (cost=24247.99..33183.41 rows=76584 width=44) (actual time=28.047..30.721 rows=50 loops=1)

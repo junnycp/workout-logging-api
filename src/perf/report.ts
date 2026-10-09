@@ -5,7 +5,7 @@ export function percentile(values: readonly number[], p: number): number {
   if (values.length === 0) throw new Error('percentile of an empty sample');
   const sorted = [...values].sort((a, b) => a - b);
   const rank = Math.max(1, Math.ceil((p / 100) * sorted.length));
-  return sorted[rank - 1] as number;
+  return sorted[rank - 1] ?? Number.NaN;
 }
 
 export interface LatencySummary {
@@ -53,7 +53,7 @@ export interface PlanScan {
   /** e.g. "Index Only Scan", "Parallel Seq Scan", "Bitmap Index Scan". */
   node: string;
   index: string | null;
-  /** Null for a Bitmap Index Scan, which names only its index. */
+  /** For a Bitmap Index Scan (which names only its index): the table of the Bitmap Heap Scan above it. */
   relation: string | null;
   /** Per loop, as EXPLAIN prints them (a parallel worker or a nested-loop iteration is one loop). */
   estimatedRows: number;
@@ -97,21 +97,23 @@ export function parseAutoExplain(message: string): ExplainedStatement {
   const firstBuffers = planLines.find((line) => line.trim().startsWith('Buffers:')) ?? '';
   const scans: PlanScan[] = [];
   let current: PlanScan | null = null;
+  let bitmapHeap: string | null = null;
   for (const line of planLines) {
     const scan = SCAN.exec(line);
     if (scan) {
-      const [, node, using, on, estimated, actual, loops] = scan as unknown as string[];
+      const [, node = '', using, on = '', estimated = '0', actual, loops] = scan;
       const bitmapIndex = node === 'Bitmap Index Scan';
       current = {
-        node: node as string,
-        index: bitmapIndex ? (on as string) : (using ?? null),
-        relation: bitmapIndex ? null : (on as string),
+        node,
+        index: bitmapIndex ? on : (using ?? null),
+        relation: bitmapIndex ? bitmapHeap : on,
         estimatedRows: Number(estimated),
         actualRows: actual === undefined ? 0 : Number(actual),
         loops: loops === undefined ? 0 : Number(loops),
         heapFetches: null,
       };
       scans.push(current);
+      if (node.endsWith('Bitmap Heap Scan')) bitmapHeap = on;
     } else if (PLAN_NODE.test(line)) {
       current = null;
     } else if (current) {
