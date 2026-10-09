@@ -1,6 +1,6 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { AppException } from '../common/errors/app-exception';
-import { ErrorCode, ErrorDetail } from '../common/errors/error-codes';
+import { DetailCode, ErrorCode, ErrorDetail } from '../common/errors/error-codes';
 import { CLOCK, Clock } from '../common/time/clock';
 import { parseRangeQuery } from '../common/time/range-query';
 import { InstantRange, localDateOf, periodRanges } from '../common/time/time';
@@ -135,20 +135,20 @@ export class PersonalRecordsService {
     if (query.period !== undefined && given.length > 0) {
       details.push({
         path: 'period',
-        code: 'CONFLICT',
+        code: DetailCode.CONFLICT,
         message: `Use either period or ${EXPLICIT_BOUNDS.join('/')}, not both`,
       });
     } else if (query.period === undefined && given.length === 0) {
       details.push({
         path: 'period',
-        code: 'REQUIRED',
+        code: DetailCode.REQUIRED,
         message: `Send period (week, month or year) or all of ${EXPLICIT_BOUNDS.join(', ')}`,
       });
     } else if (query.period === undefined) {
       for (const bound of EXPLICIT_BOUNDS.filter((b) => query[b] === undefined)) {
         details.push({
           path: bound,
-          code: 'REQUIRED',
+          code: DetailCode.REQUIRED,
           message: `${bound} is required when comparing explicit ranges`,
         });
       }
@@ -204,7 +204,7 @@ export class PersonalRecordsService {
       [
         {
           path: 'exercise',
-          code: 'UNKNOWN_EXERCISE',
+          code: DetailCode.UNKNOWN_EXERCISE,
           message: `Unknown exercise '${name}'`,
           suggestions,
         },

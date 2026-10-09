@@ -17,6 +17,28 @@ export const ErrorCode = {
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 
+/**
+ * Codes the application sets itself in `error.details[].code`. Every other detail code comes from a class-validator
+ * constraint, in UPPER_SNAKE_CASE (`isInt` -> `IS_INT`, `min` -> `MIN`, nested objects -> `NESTED_VALIDATION`).
+ */
+export const DetailCode = {
+  UNSUPPORTED_UNIT: 'UNSUPPORTED_UNIT',
+  BLANK: 'BLANK',
+  UNKNOWN_FIELD: 'UNKNOWN_FIELD',
+  UNKNOWN_EXERCISE: 'UNKNOWN_EXERCISE',
+  DATE_IN_FUTURE: 'DATE_IN_FUTURE',
+  INVALID_DATE: 'INVALID_DATE',
+  MISSING_OFFSET: 'MISSING_OFFSET',
+  MISSING_TIMEZONE: 'MISSING_TIMEZONE',
+  INVALID_TIMEZONE: 'INVALID_TIMEZONE',
+  REQUIRED: 'REQUIRED',
+  CONFLICT: 'CONFLICT',
+  MATCHES: 'MATCHES',
+  DOWN: 'DOWN',
+} as const;
+
+export type DetailCode = (typeof DetailCode)[keyof typeof DetailCode];
+
 const STATUS_CODES: Partial<Record<number, ErrorCode>> = {
   400: ErrorCode.BAD_REQUEST,
   404: ErrorCode.ROUTE_NOT_FOUND,

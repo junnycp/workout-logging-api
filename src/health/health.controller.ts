@@ -4,7 +4,7 @@ import { ApiOkResponse, ApiServiceUnavailableResponse, ApiTags } from '@nestjs/s
 import { PinoLogger } from 'nestjs-pino';
 import { ErrorResponseDto } from '../common/openapi/error-response.dto';
 import { AppException } from '../common/errors/app-exception';
-import { ErrorCode } from '../common/errors/error-codes';
+import { DetailCode, ErrorCode } from '../common/errors/error-codes';
 import { DatabaseHealthIndicator } from './database.health';
 
 @ApiTags('health')
@@ -36,7 +36,7 @@ export class HealthController {
         'One or more dependencies are unhealthy',
         Object.keys(result.error ?? {}).map((name) => ({
           path: name,
-          code: 'DOWN',
+          code: DetailCode.DOWN,
           // The raw driver error stays in the logs; clients get a stable message.
           message: `${name} is unavailable`,
         })),

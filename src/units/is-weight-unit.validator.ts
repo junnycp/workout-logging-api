@@ -1,5 +1,6 @@
 import { ValidateBy, ValidationOptions } from 'class-validator';
 import { weightUnits } from './weight-units';
+import { DetailCode } from '../common/errors/error-codes';
 
 /** Accepts only units from the registry; the message lists what is supported (E1). */
 export function IsWeightUnit(options?: ValidationOptions): PropertyDecorator {
@@ -12,6 +13,6 @@ export function IsWeightUnit(options?: ValidationOptions): PropertyDecorator {
           `Unit '${String(args?.value)}' is not supported. Supported: ${weightUnits.codes().join(', ')}`,
       },
     },
-    { ...options, context: { code: 'UNSUPPORTED_UNIT' } },
+    { ...options, context: { code: DetailCode.UNSUPPORTED_UNIT } },
   );
 }

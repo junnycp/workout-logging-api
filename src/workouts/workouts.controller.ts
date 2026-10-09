@@ -21,7 +21,7 @@ import {
 } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { AppException } from '../common/errors/app-exception';
-import { ErrorCode } from '../common/errors/error-codes';
+import { DetailCode, ErrorCode } from '../common/errors/error-codes';
 import { ErrorResponseDto } from '../common/openapi/error-response.dto';
 import { CreateWorkoutsDto, UserParamsDto } from './dto/create-workouts.dto';
 import { CreatedWorkoutsResponseDto } from './dto/created-workouts.dto';
@@ -98,7 +98,7 @@ export class WorkoutsController {
         [
           {
             path: 'Idempotency-Key',
-            code: 'MATCHES',
+            code: DetailCode.MATCHES,
             message: 'Idempotency-Key must be 1-128 characters: letters, digits, _ . : -',
           },
         ],
