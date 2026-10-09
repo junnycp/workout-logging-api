@@ -44,13 +44,17 @@ pre-start estimate, found while revising; the original table is left as written)
 Not in the original estimate: the analysis and planning phase (requirement breakdown, decisions D1–D9, Prisma
 spike, environment setup) carried out 2026-10-02 to 2026-10-05.
 
-## Revision for M7 (2026-10-08)
-
-Item 8 (performance check) was re-estimated in the M7 plan from 1.5 – 2 h to **4 – 4.75 h**: M5 and M6 moved the
-formal evidence (reproducible seed, cold cache, `docs/PERFORMANCE.md`) and the extended-statistics question into
-M7, and the review of the plan added plan capture via `auto_explain`, a separate-process latency run and the
-worst-case user. Actual time is filled in at the end with the other items.
-
 | Phase | Estimate (h) | Actual (h) |
 |-------|--------------|------------|
 | Analysis & planning | — (not estimated) | ≈ 4 |
+
+## Revision for M7 (2026-10-08)
+
+Item 8 (performance check) was re-estimated in the M7 plan from 1.5 – 2 h to **4 – 4.75 h**, which moves the
+revised total from 34 – 44 h to 36.5 – 46.75 h. Reasons:
+- M5 and M6 moved the formal evidence (reproducible seed, cold cache, `docs/PERFORMANCE.md`) and the
+  extended-statistics question into M7.
+- The review of the plan added plan capture via `auto_explain`, a separate-process latency run and the worst-case
+  user.
+
+Actual time is filled in at the end with the other items.
