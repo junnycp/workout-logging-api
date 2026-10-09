@@ -363,6 +363,29 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
 - **Commit:** `e7119ab`, `cba660d` + `7bf43ae`, `9da8126` + `3cbb15e`, `5799a36`, `b28a09f` + `89741e7`,
   `2e38219`, `d275043`, `05c2552`, `fa59066`, `bee73b0`, `cb67d57`.
 
+### C25 — M8 plan: invented causes, unsourced numbers and a fix aimed at the wrong query (2026-10-09, M8 analysis)
+- **AI output:** The first M8 plan had four problems:
+  - **Invented causes for two prompting rules.** It said "independent review before every merge" and "separate
+    correction commits" came in after C12. Both were already in the first CLAUDE.md (`a68da97`, 2026-10-02),
+    three days before C12.
+  - **Numbers with no committed source.** It quoted 458 ms (20 concurrent PR requests) and "0.05 ms vs 76 ms" (keyset
+    vs OFFSET). Both came from that day's re-run, whose output was never committed. The committed figure is 491 ms.
+  - **An unsupported gate figure.** It described the M7 verification as "52/52 pass" without saying where that came
+    from. It was the assertion count of an uncommitted runner script.
+  - **A fix aimed at the wrong query.** It proposed skipping empty `IN (...)` queries in `resolve`. That `IN (NULL)`
+    is Prisma's second query for a nested relation; it runs when the first query finds nothing, not when the input
+    list is empty.
+- **How detected:** I asked for a review of the plan before approving it. The `technical-leader` subagent:
+  - read `git show a68da97:CLAUDE.md` and `git log -p CLAUDE.md`;
+  - grepped the committed docs for the quoted numbers;
+  - read the plan of statement 2 in `docs/perf/plans/warm/P8-records-unknown-name.txt`.
+- **Outcome:** Plan rev. 2:
+  - The prompting-strategy history is built only from the CLAUDE.md git log, with a hash for every rule.
+  - Only committed figures are used, or a figure is marked as command output.
+  - The runner is kept as `plan/m7-run.sh`.
+  - The `resolve` change is dropped.
+- **Commit:** none yet (plan stage).
+
 ## 4. Rejected AI suggestions
 
 | Date | Decision | AI suggested | I decided | Reason |
