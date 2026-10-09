@@ -167,8 +167,10 @@ export function generateUserDataset(
     // Ascending ids in set order, as uuidv7() gives the API's sets (the lowest-id tie-break relies on it).
     const setIds = draft.sets.map(() => prngUuidV7(draft.ms, rng)).sort();
     draft.sets.forEach((set, i) => {
+      const setId = setIds[i];
+      if (setId === undefined) throw new Error(`Missing id for set ${i + 1} of entry ${id}`);
       sets.push({
-        id: setIds[i] ?? '',
+        id: setId,
         entryId: id,
         setNumber: i + 1,
         reps: set.reps,
