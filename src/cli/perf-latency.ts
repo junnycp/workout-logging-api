@@ -3,12 +3,15 @@ import { join } from 'node:path';
 import { envSchema } from '../config/env.schema';
 import { createPgAdapter } from '../database/pg-adapter';
 import { PrismaClient } from '../generated/prisma/client';
+import { loadPerfProfile } from '../perf/perf-profile';
 import { markdownTable, summarize } from '../perf/report';
 import {
   buildScenarios,
   deleteWrittenRows,
   indexUsage,
   PerfScenario,
+  requestAt,
+  selectScenarios,
   send,
 } from '../perf/scenarios';
 
@@ -20,22 +23,23 @@ import {
  *   PERF_API_URL=http://localhost:3000 npm run perf:latency -- --label warm
  *
  * Per scenario: 5 warm-up calls, then PERF_ITERATIONS (default 100) sequential calls cycling through the
- * scenario's request variants. Scenarios marked `concurrent` are also measured with 20 requests in flight.
+ * scenario's request variants. Scenarios marked `concurrent` are also measured in closed-loop batches of 20
+ * parallel requests (each batch waits for its slowest request). `--only <prefixes>` selects scenarios.
  * Writes docs/perf/latency-<label>.md. Needs DATABASE_URL to build cursors and to clean up POSTed rows.
  */
 const WARM_UP = 5;
 const CONCURRENCY = 20;
+/** Idle backends flush their pending statistics within 10 s (PostgreSQL 15+); idx_scan is read after that. */
+const STATS_FLUSH_MS = 11_000;
 
 async function sequential(
   baseUrl: string,
   scenario: PerfScenario,
   iterations: number,
 ): Promise<number[]> {
-  const { requests } = scenario;
-  for (let i = 0; i < WARM_UP; i++) await send(baseUrl, requests[i % requests.length]!);
+  for (let i = 0; i < WARM_UP; i++) await send(baseUrl, requestAt(scenario, i));
   const samples: number[] = [];
-  for (let i = 0; i < iterations; i++)
-    samples.push(await send(baseUrl, requests[i % requests.length]!));
+  for (let i = 0; i < iterations; i++) samples.push(await send(baseUrl, requestAt(scenario, i)));
   return samples;
 }
 
@@ -44,11 +48,10 @@ async function concurrent(
   scenario: PerfScenario,
   iterations: number,
 ): Promise<number[]> {
-  const { requests } = scenario;
   const samples: number[] = [];
   for (let round = 0; samples.length < iterations; round++) {
     const batch = Array.from({ length: CONCURRENCY }, (_, i) =>
-      send(baseUrl, requests[(round * CONCURRENCY + i) % requests.length]!),
+      send(baseUrl, requestAt(scenario, round * CONCURRENCY + i)),
     );
     samples.push(...(await Promise.all(batch)));
   }
@@ -67,7 +70,8 @@ async function main(): Promise<void> {
 
   const prisma = new PrismaClient({ adapter: createPgAdapter(DATABASE_URL) });
   try {
-    const scenarios = await buildScenarios(prisma);
+    const profile = loadPerfProfile(process.env.PERF_PROFILE);
+    const scenarios = selectScenarios(await buildScenarios(prisma, profile), process.argv);
     await prisma.$executeRawUnsafe('SELECT pg_stat_reset()');
 
     const rows: (string | number)[][] = [];
@@ -88,7 +92,7 @@ async function main(): Promise<void> {
         rows.push([
           scenario.id,
           scenario.requests.length,
-          `${CONCURRENCY} in flight`,
+          `batches of ${CONCURRENCY}`,
           c.n,
           ms(c.p50),
           ms(c.p95),
@@ -100,6 +104,7 @@ async function main(): Promise<void> {
       console.error(`${scenario.id} done`);
     }
 
+    await new Promise((resolve) => setTimeout(resolve, STATS_FLUSH_MS));
     const report = [
       `# Endpoint latency (${label})`,
       '',

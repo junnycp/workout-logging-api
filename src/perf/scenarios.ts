@@ -1,5 +1,13 @@
 import { encodeCursor } from '../common/pagination/cursor';
 import type { PrismaClient } from '../generated/prisma/client';
+import { expandUsers, PerfProfile } from './perf-profile';
+
+/**
+ * What a successful response must contain, so a scenario whose data is missing (e.g. after a profile change)
+ * fails instead of being reported as fast: `entries` = non-empty history page, `records` = a maxWeight record,
+ * `no-records` = null records with a message, `comparison` = records in both periods.
+ */
+export type Expectation = 'entries' | 'records' | 'no-records' | 'comparison';
 
 /** One HTTP call against the API, relative to the API base URL. */
 export interface PerfRequest {
@@ -8,6 +16,7 @@ export interface PerfRequest {
   query?: Record<string, string>;
   body?: unknown;
   expectStatus: number;
+  expect?: Expectation;
 }
 
 /**
@@ -17,7 +26,7 @@ export interface PerfRequest {
 export interface PerfScenario {
   id: string;
   title: string;
-  requests: PerfRequest[];
+  requests: [PerfRequest, ...PerfRequest[]];
   /** Also measured with 20 requests in flight (pool behaviour). */
   concurrent?: boolean;
   /** Caps the latency samples (the max bulk writes 5,000 sets per call). */
@@ -26,30 +35,10 @@ export interface PerfScenario {
 
 export const HEAVY = 'perf-heavy';
 export const SINGLE = 'perf-single';
-const BACKGROUND = Array.from(
-  { length: 50 },
-  (_, i) => `perf-bg-${String(i + 1).padStart(3, '0')}`,
-);
+const BACKGROUND_PREFIX = 'perf-bg-';
 /** POST scenarios write as these users; their rows are deleted after every pass. */
 export const WRITE_USER_PREFIX = 'perf-write';
 
-const REGULAR_EXERCISES = [
-  'Bench Press',
-  'Back Squat',
-  'Deadlift',
-  'Overhead Press',
-  'Lat Pulldown',
-  'Romanian Deadlift',
-  'Incline Bench Press',
-  'Dumbbell Row',
-  'Leg Press',
-  'Barbell Curl',
-  'Front Squat',
-  'Lateral Raise',
-  'Hip Thrust',
-  'Face Pull',
-  'Goblet Squat',
-];
 /** Explicit, data-anchored ranges (the dataset ends 2026-10-01): results do not depend on today's date. */
 const SEPT = { from: '2026-09-01', to: '2026-09-30' };
 const AUG = { from: '2026-08-01', to: '2026-08-31' };
@@ -60,16 +49,17 @@ const history = (userId: string, query: Record<string, string> = {}): PerfReques
   path: `/api/v1/users/${userId}/workouts`,
   query,
   expectStatus: 200,
+  expect: 'entries',
 });
 const records = (
   userId: string,
   query: Record<string, string>,
-  expectStatus = 200,
+  expectation: Expectation | 400 = 'records',
 ): PerfRequest => ({
   method: 'GET',
   path: `/api/v1/users/${userId}/personal-records`,
   query,
-  expectStatus,
+  ...(expectation === 400 ? { expectStatus: 400 } : { expectStatus: 200, expect: expectation }),
 });
 const compare = (userId: string, exercise: string): PerfRequest => ({
   method: 'GET',
@@ -83,13 +73,14 @@ const compare = (userId: string, exercise: string): PerfRequest => ({
     previousTo: AUG.to,
   },
   expectStatus: 200,
+  expect: 'comparison',
 });
-const post = (entries: number, setsPerEntry: number): PerfRequest => ({
+const post = (exercises: string[], entries: number, setsPerEntry: number): PerfRequest => ({
   method: 'POST',
   path: `/api/v1/users/${WRITE_USER_PREFIX}-${entries}x${setsPerEntry}/workouts`,
   body: {
     entries: Array.from({ length: entries }, (_, i) => ({
-      exerciseName: REGULAR_EXERCISES[i % REGULAR_EXERCISES.length],
+      exerciseName: exercises[i % exercises.length],
       date: `2026-09-${String(1 + (i % 28)).padStart(2, '0')}T18:30:00+07:00`,
       sets: Array.from({ length: setsPerEntry }, (_, s) => ({
         reps: 5 + (s % 6),
@@ -102,10 +93,26 @@ const post = (entries: number, setsPerEntry: number): PerfRequest => ({
 });
 
 /**
- * The scenario list, built from the seeded data (cursors at given depths need real rows). Fails when the
- * dataset is missing; perf-single scenarios appear only when that optional user was seeded.
+ * The scenario list, built from the profile (users, exercises, scenario exercises) and the seeded data (cursors at
+ * given depths need real rows). Fails when the dataset is missing; perf-single scenarios appear only when that
+ * optional user was seeded. POST scenarios come last, so their writes cannot affect the read scenarios.
  */
-export async function buildScenarios(prisma: PrismaClient): Promise<PerfScenario[]> {
+export async function buildScenarios(
+  prisma: PrismaClient,
+  profile: PerfProfile,
+): Promise<PerfScenario[]> {
+  const users = expandUsers(profile, { includeOptional: true });
+  const heavy = users.find((user) => user.id === HEAVY);
+  const { oldOnly, bodyweightOnly, plateau } = heavy?.scenarios ?? {};
+  if (!heavy || !oldOnly || !bodyweightOnly || !plateau)
+    throw new Error(
+      `The profile must define ${HEAVY} with oldOnly, bodyweightOnly and plateau scenarios.`,
+    );
+  const background = users.filter((user) => user.id.startsWith(BACKGROUND_PREFIX)).map((u) => u.id);
+  // The 15 most-logged exercises (the profile lists them by frequency, Zipf-like).
+  const exercises = heavy.exercises.slice(0, 15);
+  const [first = '', second = '', third = '', fourth = ''] = exercises;
+
   const heavyEntries = await prisma.workoutEntry.count({ where: { userId: HEAVY } });
   if (heavyEntries === 0) throw new Error(`No rows for ${HEAVY}: run "npm run seed:perf" first.`);
   const hasSingle = (await prisma.workoutEntry.count({ where: { userId: SINGLE } })) > 0;
@@ -123,11 +130,18 @@ export async function buildScenarios(prisma: PrismaClient): Promise<PerfScenario
   const deepCursors = await Promise.all(depths.map(cursorAt));
   const lastPage = await cursorAt(heavyEntries - 20);
 
+  const atLeastOne = <T>(items: T[]): [T, ...T[]] => {
+    const [head, ...rest] = items;
+    if (head === undefined) throw new Error('A scenario needs at least one request');
+    return [head, ...rest];
+  };
+  const typicalUsers = background.slice(0, 10);
+
   const scenarios: PerfScenario[] = [
     {
       id: 'H1-history-first-page',
-      title: 'History, first page, no filter',
-      requests: [history(HEAVY), ...BACKGROUND.slice(0, 9).map((u) => history(u))],
+      title: 'History, first page, no filter (perf-heavy + 9 background users)',
+      requests: atLeastOne([HEAVY, ...typicalUsers.slice(0, 9)].map((u) => history(u))),
       concurrent: true,
     },
     {
@@ -140,26 +154,28 @@ export async function buildScenarios(prisma: PrismaClient): Promise<PerfScenario
     },
     {
       id: 'H3-history-partial-name',
-      title: 'History, partial name "bench press" (5 exercises)',
-      requests: ['bench press', 'squat', 'curl', 'row', 'deadlift'].map((exercise) =>
-        history(HEAVY, { exercise }),
+      title: 'History, partial name ("bench press" matches 5 exercises)',
+      requests: atLeastOne(
+        ['bench press', 'squat', 'curl', 'row', 'deadlift'].map((exercise) =>
+          history(HEAVY, { exercise }),
+        ),
       ),
     },
     {
       id: 'H4-history-broad-name',
       title: 'History, broad name "e" (most of the catalog)',
-      requests: ['e', 'a', 'r'].map((exercise) => history(HEAVY, { exercise })),
+      requests: atLeastOne(['e', 'a', 'r'].map((exercise) => history(HEAVY, { exercise }))),
     },
     {
       id: 'H5-history-old-exercise',
-      title: 'History, exercise only logged > 2 years ago (skew)',
-      requests: [history(HEAVY, { exercise: 'sumo deadlift' })],
+      title: `History, ${oldOnly.exercise}: only logged in the first ${oldOnly.withinFirstDays} days (skew)`,
+      requests: [history(HEAVY, { exercise: oldOnly.exercise })],
     },
     {
       id: 'H6-history-muscle-group',
-      title: 'History, muscleGroup=chest',
-      requests: ['chest', 'quads', 'biceps', 'lats'].map((muscleGroup) =>
-        history(HEAVY, { muscleGroup }),
+      title: 'History, muscleGroup (chest, quads, biceps, lats)',
+      requests: atLeastOne(
+        ['chest', 'quads', 'biceps', 'lats'].map((muscleGroup) => history(HEAVY, { muscleGroup })),
       ),
     },
     {
@@ -175,47 +191,51 @@ export async function buildScenarios(prisma: PrismaClient): Promise<PerfScenario
       title: 'History, limit=100, unit=lb',
       requests: [
         history(HEAVY, { limit: '100', unit: 'lb' }),
-        history(HEAVY, { limit: '100', unit: 'lb', cursor: deepCursors[4] as string }),
+        ...deepCursors
+          .slice(4, 5)
+          .map((cursor) => history(HEAVY, { limit: '100', unit: 'lb', cursor })),
       ],
     },
     {
       id: 'P1-records-largest-exercise',
-      title: 'PRs, all-time, most-logged exercise (Bench Press, ~53k sets)',
-      requests: [records(HEAVY, { exercise: 'Bench Press' })],
+      title: `PRs, all-time, most-logged exercise (${first})`,
+      requests: [records(HEAVY, { exercise: first })],
     },
     {
       id: 'P2-records-typical-exercises',
-      title: 'PRs, all-time, 15 exercises of perf-heavy (plan: Leg Press, ~6k sets)',
+      title: 'PRs, all-time, exercises 4-15 by frequency (the 3 most-logged excluded)',
       // A mid-frequency exercise first: requests[0] is the one whose plan is captured.
-      requests: [...REGULAR_EXERCISES.slice(8), ...REGULAR_EXERCISES.slice(0, 8)].map((exercise) =>
-        records(HEAVY, { exercise }),
+      requests: atLeastOne(
+        [...exercises.slice(8), ...exercises.slice(3, 8)].map((exercise) =>
+          records(HEAVY, { exercise }),
+        ),
       ),
       concurrent: true,
     },
     {
       id: 'P3-records-one-month',
-      title: 'PRs, one month, Bench Press',
-      requests: [records(HEAVY, { exercise: 'Bench Press', from: SEPT.from, to: SEPT.to, tz: TZ })],
+      title: `PRs, one month, ${first}`,
+      requests: [records(HEAVY, { exercise: first, from: SEPT.from, to: SEPT.to, tz: TZ })],
     },
     {
       id: 'P4-records-plateau',
-      title: 'PRs, plateau: every set tied on the top value (Barbell Row)',
-      requests: [records(HEAVY, { exercise: 'Barbell Row' })],
+      title: `PRs, plateau: every set tied on the top value (${plateau.exercise})`,
+      requests: [records(HEAVY, { exercise: plateau.exercise })],
     },
     {
       id: 'P5-records-natural-ties',
-      title: 'PRs, > 50 natural ties on the top weight (Lateral Raise)',
+      title: 'PRs, Lateral Raise: more than 50 sets tied on the top weight in this dataset',
       requests: [records(HEAVY, { exercise: 'Lateral Raise' })],
     },
     {
       id: 'P6-records-bodyweight-only',
-      title: 'PRs, bodyweight-only exercise (Pull-Up)',
-      requests: [records(HEAVY, { exercise: 'Pull-Up' })],
+      title: `PRs, bodyweight-only exercise (${bodyweightOnly.exercise})`,
+      requests: [records(HEAVY, { exercise: bodyweightOnly.exercise }, 'no-records')],
     },
     {
       id: 'P7-records-typical-user',
-      title: 'PRs, background user (2k entries)',
-      requests: BACKGROUND.slice(0, 10).map((u) => records(u, { exercise: 'Bench Press' })),
+      title: `PRs, background users (2k entries), ${first}`,
+      requests: atLeastOne(typicalUsers.map((u) => records(u, { exercise: first }))),
     },
     {
       id: 'P8-records-unknown-name',
@@ -224,21 +244,13 @@ export async function buildScenarios(prisma: PrismaClient): Promise<PerfScenario
     },
     {
       id: 'C1-compare-months',
-      title: 'Compare Sept vs Aug (explicit bounds)',
-      requests: ['Bench Press', 'Back Squat', 'Deadlift', 'Overhead Press'].map((e) =>
-        compare(HEAVY, e),
-      ),
-    },
-    {
-      id: 'W1-post-one-entry',
-      title: 'POST 1 entry x 5 sets',
-      requests: [post(1, 5)],
-    },
-    {
-      id: 'W2-post-max-bulk',
-      title: 'POST 100 entries x 50 sets (max bulk)',
-      requests: [post(100, 50)],
-      maxIterations: 20,
+      title: 'Compare Sept vs Aug (explicit bounds), 4 most-logged exercises',
+      requests: [
+        compare(HEAVY, first),
+        compare(HEAVY, second),
+        compare(HEAVY, third),
+        compare(HEAVY, fourth),
+      ],
     },
   ];
 
@@ -256,7 +268,35 @@ export async function buildScenarios(prisma: PrismaClient): Promise<PerfScenario
       },
     );
   }
+
+  scenarios.push(
+    { id: 'W1-post-one-entry', title: 'POST 1 entry x 5 sets', requests: [post(exercises, 1, 5)] },
+    {
+      id: 'W2-post-max-bulk',
+      title: 'POST 100 entries x 50 sets (max bulk)',
+      requests: [post(exercises, 100, 50)],
+      maxIterations: 20,
+    },
+  );
   return scenarios;
+}
+
+/** The i-th request of a scenario, cycling through its variants. */
+export function requestAt(scenario: PerfScenario, i: number): PerfRequest {
+  return scenario.requests[i % scenario.requests.length] ?? scenario.requests[0];
+}
+
+/** `--only S1,S2` keeps the scenarios whose id starts with one of the prefixes; no flag keeps all. */
+export function selectScenarios(
+  scenarios: PerfScenario[],
+  argv: readonly string[],
+): PerfScenario[] {
+  const at = argv.indexOf('--only');
+  if (at < 0) return scenarios;
+  const prefixes = (argv[at + 1] ?? '').split(',').filter(Boolean);
+  const selected = scenarios.filter((s) => prefixes.some((prefix) => s.id.startsWith(prefix)));
+  if (selected.length === 0) throw new Error(`--only ${argv[at + 1]} matches no scenario`);
+  return selected;
 }
 
 /** Full URL of a request against `baseUrl`. */
@@ -266,7 +306,27 @@ export function urlOf(baseUrl: string, request: PerfRequest): string {
   return url.toString();
 }
 
-/** Sends one request and checks its status; returns the elapsed milliseconds (body fully read). */
+const failure = (expectation: Expectation, body: unknown): string | null => {
+  const { data, meta } = (body ?? {}) as { data?: unknown; meta?: { message?: string } };
+  const record = (side: unknown) => (side as { maxWeight?: unknown } | undefined)?.maxWeight;
+  switch (expectation) {
+    case 'entries':
+      return Array.isArray(data) && data.length > 0 ? null : 'empty history page';
+    case 'records':
+      return record(data) ? null : 'no record';
+    case 'no-records':
+      return record(data) === null && meta?.message ? null : 'expected null records with a message';
+    case 'comparison': {
+      const { current, previous } = (data ?? {}) as { current?: unknown; previous?: unknown };
+      return record(current) && record(previous) ? null : 'a period without records';
+    }
+  }
+};
+
+/**
+ * Sends one request and checks its status and, when set, its content (an empty result would be measured as
+ * fast); returns the elapsed milliseconds with the body fully read.
+ */
 export async function send(baseUrl: string, request: PerfRequest): Promise<number> {
   const started = performance.now();
   const response = await fetch(urlOf(baseUrl, request), {
@@ -276,9 +336,13 @@ export async function send(baseUrl: string, request: PerfRequest): Promise<numbe
   });
   const text = await response.text();
   const elapsed = performance.now() - started;
-  if (response.status !== request.expectStatus) {
+  const problem =
+    response.status !== request.expectStatus
+      ? `expected ${request.expectStatus}, got ${response.status}`
+      : request.expect && failure(request.expect, JSON.parse(text) as unknown);
+  if (problem) {
     throw new Error(
-      `${request.method} ${urlOf(baseUrl, request)}: expected ${request.expectStatus}, got ${response.status} ${text.slice(0, 300)}`,
+      `${request.method} ${urlOf(baseUrl, request)}: ${problem}: ${text.slice(0, 300)}`,
     );
   }
   return elapsed;

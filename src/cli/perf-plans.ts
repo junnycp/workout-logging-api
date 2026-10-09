@@ -10,12 +10,14 @@ import { envSchema } from '../config/env.schema';
 import { createPgAdapter } from '../database/pg-adapter';
 import { PrismaService } from '../database/prisma.service';
 import { PrismaClient } from '../generated/prisma/client';
+import { loadPerfProfile } from '../perf/perf-profile';
 import { ExplainedStatement, markdownTable, parseAutoExplain, truncate } from '../perf/report';
 import {
   buildScenarios,
   deleteWrittenRows,
   indexUsage,
   PerfRequest,
+  selectScenarios,
   send,
   tableSizes,
   urlOf,
@@ -29,6 +31,7 @@ import {
  *
  *   npm run perf:plans -- --label cold   # right after `docker compose restart postgres`
  *   npm run perf:plans -- --label warm
+ *   npm run perf:plans -- --label single --only S   # only scenarios whose id starts with S
  *
  * Writes docs/perf/plans/<label>/<scenario>.txt (raw plans) and summary.md. Needs a superuser role (the
  * compose `workouts` user is one) and the perf dataset (`npm run seed:perf`). Timings are not latencies:
@@ -78,7 +81,7 @@ function rawPlanFile(
 function bigTableScans(statements: ExplainedStatement[]): string {
   const scans = statements.flatMap((s) =>
     s.scans
-      .filter((scan) => scan.relation === null || BIG_TABLES.has(scan.relation))
+      .filter((scan) => scan.relation !== null && BIG_TABLES.has(scan.relation))
       .map(
         (scan) =>
           `${scan.node} ${scan.index ?? scan.relation} (est ${scan.estimatedRows} / actual ${scan.actualRows}` +
@@ -113,15 +116,24 @@ async function main(): Promise<void> {
   );
   await app.listen(0, '127.0.0.1');
   const baseUrl = await app.getUrl();
+  let closed = false;
+  const closeApp = async (): Promise<void> => {
+    if (closed) return;
+    closed = true;
+    await app.close();
+    await explained.$disconnect();
+    if (!pool.ended) await pool.end().catch(() => undefined);
+  };
 
   try {
-    const scenarios = await buildScenarios(plain);
+    const profile = loadPerfProfile(process.env.PERF_PROFILE);
+    const scenarios = selectScenarios(await buildScenarios(plain, profile), process.argv);
     await plain.$executeRawUnsafe('SELECT pg_stat_reset()');
     mkdirSync(outDir, { recursive: true });
 
     const rows: (string | number)[][] = [];
     for (const scenario of scenarios) {
-      const request = scenario.requests[0] as PerfRequest;
+      const request = scenario.requests[0];
       notices.length = 0;
       await send(baseUrl, request);
       const statements = notices.map(parseAutoExplain);
@@ -134,13 +146,15 @@ async function main(): Promise<void> {
         scenario.id,
         statements.length,
         Number(durations.reduce((a, b) => a + b, 0).toFixed(2)),
-        Number(Math.max(...durations).toFixed(2)),
+        Number(Math.max(0, ...durations).toFixed(2)),
         statements.reduce((sum, s) => sum + s.buffers.hit, 0),
         statements.reduce((sum, s) => sum + s.buffers.read, 0),
         bigTableScans(statements) || '-',
       ]);
     }
     await deleteWrittenRows(plain);
+    // Backends flush index statistics when they exit: close the explained pool before reading idx_scan.
+    await closeApp();
 
     const summary = [
       `# Query plans (${label})`,
@@ -180,10 +194,8 @@ async function main(): Promise<void> {
     writeFileSync(join(outDir, 'summary.md'), summary);
     console.log(summary);
   } finally {
-    await app.close();
+    await closeApp();
     await plain.$disconnect();
-    await explained.$disconnect();
-    await pool.end().catch(() => undefined);
   }
 }
 
