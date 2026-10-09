@@ -2,16 +2,16 @@
 GET /api/v1/users/perf-heavy/workouts?exercise=bench+press
 5 statements
 
-## Statement 1: 0.06 ms
+## Statement 1: 0.375 ms
 Query: SELECT "public"."exercise_names"."name_key", "public"."exercise_names"."exercise_id" FROM "public"."exercise_names" WHERE "public"."exercise_names"."name_key"::text LIKE ('%' || $1 || '%') OFFSET $2
 Parameters: $1 = 'bench press', $2 = '0'
 
-Seq Scan on exercise_names  (cost=0.00..4.84 rows=12 width=30) (actual time=0.035..0.055 rows=11 loops=1)
+Seq Scan on exercise_names  (cost=0.00..4.84 rows=12 width=30) (actual time=0.207..0.370 rows=11 loops=1)
   Filter: ((name_key)::text ~~ '%bench press%'::text)
   Rows Removed by Filter: 136
-  Buffers: shared read=3 dirtied=3
+  Buffers: shared read=3
 
-## Statement 2: 0.162 ms
+## Statement 2: 1.292 ms
 Query: SELECT p.*
       FROM unnest($1::uuid[]) AS x(exercise_id)
       CROSS JOIN LATERAL (
@@ -24,57 +24,57 @@ Query: SELECT p.*
       ) p
       ORDER BY p."performedAt" DESC, p.id DESC
       LIMIT $4
-Parameters: $1 = '{01a11ad8-162f-7099-aa23-68bf68dcff30,01a11ad8-161d-743b-a69d-25c64cfff473,01a11ad8-161e-743f-be2f-6905360cabf6,01a11ad8-161f-7309-abc2-276da23160b1,01a11ad8-161f-7309-abc2-28a70ecfdb13}', $2 = 'perf-heavy', $3 = '21', $4 = '21'
+Parameters: $1 = '{01a11ee7-5773-770b-924d-8749aae32d11,01a11ee7-5774-72ac-910f-57e7f7e94a1f,01a11ee7-5774-72ac-910f-5b845fd22b9b,01a11ee7-5775-72cf-ad62-19b69cfbc51a,01a11ee7-5786-70fb-b85b-e6b56e62aece}', $2 = 'perf-heavy', $3 = '21', $4 = '21'
 
-Limit  (cost=360.27..360.32 rows=21 width=42) (actual time=0.148..0.150 rows=21 loops=1)
-  Buffers: shared hit=45 read=7
-  ->  Sort  (cost=360.27..360.53 rows=105 width=42) (actual time=0.147..0.148 rows=21 loops=1)
+Limit  (cost=293.61..293.66 rows=21 width=42) (actual time=1.276..1.279 rows=21 loops=1)
+  Buffers: shared hit=21 read=32
+  ->  Sort  (cost=293.61..293.87 rows=105 width=42) (actual time=1.275..1.277 rows=21 loops=1)
         Sort Key: e.performed_at DESC, e.id DESC
-        Sort Method: top-N heapsort  Memory: 28kB
-        Buffers: shared hit=45 read=7
-        ->  Nested Loop  (cost=0.42..357.44 rows=105 width=42) (actual time=0.044..0.129 rows=84 loops=1)
-              Buffers: shared hit=45 read=7
-              ->  Function Scan on unnest x  (cost=0.00..0.05 rows=5 width=16) (actual time=0.010..0.011 rows=5 loops=1)
-              ->  Limit  (cost=0.42..71.27 rows=21 width=42) (actual time=0.016..0.022 rows=17 loops=5)
-                    Buffers: shared hit=45 read=7
-                    ->  Index Scan using workout_entries_user_id_exercise_id_performed_at_id_idx on workout_entries e  (cost=0.42..5040.71 rows=1494 width=42) (actual time=0.015..0.021 rows=17 loops=5)
+        Sort Method: top-N heapsort  Memory: 26kB
+        Buffers: shared hit=21 read=32
+        ->  Nested Loop  (cost=0.42..290.78 rows=105 width=42) (actual time=0.063..1.245 rows=84 loops=1)
+              Buffers: shared hit=18 read=32
+              ->  Function Scan on unnest x  (cost=0.00..0.05 rows=5 width=16) (actual time=0.019..0.020 rows=5 loops=1)
+              ->  Limit  (cost=0.42..57.94 rows=21 width=42) (actual time=0.192..0.243 rows=17 loops=5)
+                    Buffers: shared hit=18 read=32
+                    ->  Index Scan using workout_entries_user_id_exercise_id_performed_at_id_idx on workout_entries e  (cost=0.42..4166.17 rows=1521 width=42) (actual time=0.191..0.241 rows=17 loops=5)
                           Index Cond: (((user_id)::text = 'perf-heavy'::text) AND (exercise_id = x.exercise_id))
-                          Buffers: shared hit=45 read=7
+                          Buffers: shared hit=18 read=32
 
-## Statement 3: 0.01 ms
-Query: SELECT "public"."exercises"."id", "public"."exercises"."name" FROM "public"."exercises" WHERE "public"."exercises"."id" IN ($1,$2,$3) OFFSET $4
-Parameters: $1 = '01a11ad8-161d-743b-a69d-25c64cfff473', $2 = '01a11ad8-161f-7309-abc2-28a70ecfdb13', $3 = '01a11ad8-161e-743f-be2f-6905360cabf6', $4 = '0'
-
-Seq Scan on exercises  (cost=0.00..1.78 rows=3 width=30) (actual time=0.005..0.008 rows=3 loops=1)
-  Filter: (id = ANY ('{01a11ad8-161d-743b-a69d-25c64cfff473,01a11ad8-161f-7309-abc2-28a70ecfdb13,01a11ad8-161e-743f-be2f-6905360cabf6}'::uuid[]))
-  Rows Removed by Filter: 54
-  Buffers: shared hit=1
-
-## Statement 4: 0.176 ms
+## Statement 3: 0.185 ms
 Query: SELECT "public"."workout_sets"."id", "public"."workout_sets"."entry_id", "public"."workout_sets"."set_number", "public"."workout_sets"."reps", "public"."workout_sets"."weight", "public"."workout_sets"."unit" FROM "public"."workout_sets" WHERE "public"."workout_sets"."entry_id" IN ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) ORDER BY "public"."workout_sets"."entry_id" ASC, "public"."workout_sets"."set_number" ASC OFFSET $21
 Parameters: $1 = '01a0f483-9820-7f14-b7b9-03d8c860ad47', $2 = '01a0f483-9820-7e75-b349-9811b1c7e05b', $3 = '01a0f47a-7060-71f1-9a06-541daf92e6ab', $4 = '01a0f430-4800-718d-ad09-7cfe9e26d965', $5 = '01a0f3fa-43e0-73cf-bc1f-652b98cd7df7', $6 = '01a0f3e3-6080-7ce3-88b9-d820431e1a6e', $7 = '01a0f391-e520-73f9-b660-f2056232689a', $8 = '01a0f332-ae20-7ad3-89b5-05ab3e42f220', $9 = '01a0f30c-3a60-7b21-bc6a-714ce4c20209', $10 = '01a0f22e-aba0-741f-b7d4-32b80f8dee10', $11 = '01a0f18f-5e60-7f69-a866-4f1687ac0df2', $12 = '01a0f156-9b20-758e-b108-c84bf2935a89', $13 = '01a0f0ea-92e0-74f7-a265-18871c82898e', $14 = '01a0f072-a3c0-741a-a0ce-62abffc8435f', $15 = '01a0f059-eba0-7802-952e-16d42d8550a2', $16 = '01a0efcf-ad00-78b5-90fd-9c20a5e4ba0a', $17 = '01a0efc9-4460-705f-88ef-7bd9e2f5e570', $18 = '01a0efb4-35c0-774e-b72e-3fdab53aedb2', $19 = '01a0ef8b-ed40-756b-9bdc-565095c152f3', $20 = '01a0ef5d-3c20-7f3c-8f40-9f362490f84e', $21 = '0'
 
-Sort  (cost=451.70..451.94 rows=94 width=46) (actual time=0.093..0.096 rows=87 loops=1)
+Sort  (cost=454.92..455.16 rows=97 width=46) (actual time=0.132..0.135 rows=87 loops=1)
   Sort Key: entry_id, set_number
   Sort Method: quicksort  Memory: 31kB
-  Buffers: shared hit=60 read=4
-  ->  Bitmap Heap Scan on workout_sets  (cost=89.32..448.62 rows=94 width=46) (actual time=0.048..0.067 rows=87 loops=1)
+  Buffers: shared hit=59 read=5
+  ->  Bitmap Heap Scan on workout_sets  (cost=89.32..451.72 rows=97 width=46) (actual time=0.094..0.115 rows=87 loops=1)
         Recheck Cond: (entry_id = ANY ('{01a0f483-9820-7f14-b7b9-03d8c860ad47,01a0f483-9820-7e75-b349-9811b1c7e05b,01a0f47a-7060-71f1-9a06-541daf92e6ab,01a0f430-4800-718d-ad09-7cfe9e26d965,01a0f3fa-43e0-73cf-bc1f-652b98cd7df7,01a0f3e3-6080-7ce3-88b9-d820431e1a6e,01a0f391-e520-73f9-b660-f2056232689a,01a0f332-ae20-7ad3-89b5-05ab3e42f220,01a0f30c-3a60-7b21-bc6a-714ce4c20209,01a0f22e-aba0-741f-b7d4-32b80f8dee10,01a0f18f-5e60-7f69-a866-4f1687ac0df2,01a0f156-9b20-758e-b108-c84bf2935a89,01a0f0ea-92e0-74f7-a265-18871c82898e,01a0f072-a3c0-741a-a0ce-62abffc8435f,01a0f059-eba0-7802-952e-16d42d8550a2,01a0efcf-ad00-78b5-90fd-9c20a5e4ba0a,01a0efc9-4460-705f-88ef-7bd9e2f5e570,01a0efb4-35c0-774e-b72e-3fdab53aedb2,01a0ef8b-ed40-756b-9bdc-565095c152f3,01a0ef5d-3c20-7f3c-8f40-9f362490f84e}'::uuid[]))
         Heap Blocks: exact=4
-        Buffers: shared hit=60 read=4
-        ->  Bitmap Index Scan on workout_sets_entry_id_set_number_key  (cost=0.00..89.25 rows=94 width=0) (actual time=0.039..0.039 rows=87 loops=1)
+        Buffers: shared hit=59 read=5
+        ->  Bitmap Index Scan on workout_sets_entry_id_set_number_key  (cost=0.00..89.25 rows=97 width=0) (actual time=0.080..0.080 rows=87 loops=1)
               Index Cond: (entry_id = ANY ('{01a0f483-9820-7f14-b7b9-03d8c860ad47,01a0f483-9820-7e75-b349-9811b1c7e05b,01a0f47a-7060-71f1-9a06-541daf92e6ab,01a0f430-4800-718d-ad09-7cfe9e26d965,01a0f3fa-43e0-73cf-bc1f-652b98cd7df7,01a0f3e3-6080-7ce3-88b9-d820431e1a6e,01a0f391-e520-73f9-b660-f2056232689a,01a0f332-ae20-7ad3-89b5-05ab3e42f220,01a0f30c-3a60-7b21-bc6a-714ce4c20209,01a0f22e-aba0-741f-b7d4-32b80f8dee10,01a0f18f-5e60-7f69-a866-4f1687ac0df2,01a0f156-9b20-758e-b108-c84bf2935a89,01a0f0ea-92e0-74f7-a265-18871c82898e,01a0f072-a3c0-741a-a0ce-62abffc8435f,01a0f059-eba0-7802-952e-16d42d8550a2,01a0efcf-ad00-78b5-90fd-9c20a5e4ba0a,01a0efc9-4460-705f-88ef-7bd9e2f5e570,01a0efb4-35c0-774e-b72e-3fdab53aedb2,01a0ef8b-ed40-756b-9bdc-565095c152f3,01a0ef5d-3c20-7f3c-8f40-9f362490f84e}'::uuid[]))
-              Buffers: shared hit=58 read=2
+              Buffers: shared hit=57 read=3
 
-## Statement 5: 0.026 ms
+## Statement 4: 0.008 ms
+Query: SELECT "public"."exercises"."id", "public"."exercises"."name" FROM "public"."exercises" WHERE "public"."exercises"."id" IN ($1,$2,$3) OFFSET $4
+Parameters: $1 = '01a11ee7-5773-770b-924d-8749aae32d11', $2 = '01a11ee7-5775-72cf-ad62-19b69cfbc51a', $3 = '01a11ee7-5774-72ac-910f-57e7f7e94a1f', $4 = '0'
+
+Seq Scan on exercises  (cost=0.00..1.78 rows=3 width=30) (actual time=0.004..0.007 rows=3 loops=1)
+  Filter: (id = ANY ('{01a11ee7-5773-770b-924d-8749aae32d11,01a11ee7-5775-72cf-ad62-19b69cfbc51a,01a11ee7-5774-72ac-910f-57e7f7e94a1f}'::uuid[]))
+  Rows Removed by Filter: 54
+  Buffers: shared hit=1
+
+## Statement 5: 0.025 ms
 Query: SELECT "public"."exercise_muscle_groups"."exercise_id", "public"."exercise_muscle_groups"."muscle_group_code", "public"."exercise_muscle_groups"."role"::text FROM "public"."exercise_muscle_groups" WHERE "public"."exercise_muscle_groups"."exercise_id" IN ($1,$2,$3) ORDER BY "public"."exercise_muscle_groups"."role" ASC, "public"."exercise_muscle_groups"."muscle_group_code" ASC OFFSET $4
-Parameters: $1 = '01a11ad8-161d-743b-a69d-25c64cfff473', $2 = '01a11ad8-161e-743f-be2f-6905360cabf6', $3 = '01a11ad8-161f-7309-abc2-28a70ecfdb13', $4 = '0'
+Parameters: $1 = '01a11ee7-5773-770b-924d-8749aae32d11', $2 = '01a11ee7-5774-72ac-910f-57e7f7e94a1f', $3 = '01a11ee7-5775-72cf-ad62-19b69cfbc51a', $4 = '0'
 
-Sort  (cost=5.10..5.12 rows=9 width=60) (actual time=0.023..0.023 rows=9 loops=1)
+Sort  (cost=5.10..5.12 rows=9 width=60) (actual time=0.021..0.021 rows=9 loops=1)
   Sort Key: role, muscle_group_code
   Sort Method: quicksort  Memory: 25kB
   Buffers: shared hit=3
-  ->  Seq Scan on exercise_muscle_groups  (cost=0.00..4.96 rows=9 width=60) (actual time=0.009..0.015 rows=9 loops=1)
-        Filter: (exercise_id = ANY ('{01a11ad8-161d-743b-a69d-25c64cfff473,01a11ad8-161e-743f-be2f-6905360cabf6,01a11ad8-161f-7309-abc2-28a70ecfdb13}'::uuid[]))
+  ->  Seq Scan on exercise_muscle_groups  (cost=0.00..4.96 rows=9 width=60) (actual time=0.005..0.012 rows=9 loops=1)
+        Filter: (exercise_id = ANY ('{01a11ee7-5773-770b-924d-8749aae32d11,01a11ee7-5774-72ac-910f-57e7f7e94a1f,01a11ee7-5775-72cf-ad62-19b69cfbc51a}'::uuid[]))
         Rows Removed by Filter: 130
         Buffers: shared hit=3

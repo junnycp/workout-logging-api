@@ -6,7 +6,7 @@ GET /api/v1/users/perf-heavy/personal-records?exercise=bench+pres
 Query: SELECT "public"."exercise_names"."name_key", "public"."exercise_names"."exercise_id" FROM "public"."exercise_names" WHERE "public"."exercise_names"."name_key" IN ($1) OFFSET $2
 Parameters: $1 = 'bench pres', $2 = '0'
 
-Seq Scan on exercise_names  (cost=0.00..4.84 rows=1 width=30) (actual time=0.008..0.008 rows=0 loops=1)
+Seq Scan on exercise_names  (cost=0.00..4.84 rows=1 width=30) (actual time=0.007..0.007 rows=0 loops=1)
   Filter: ((name_key)::text = 'bench pres'::text)
   Rows Removed by Filter: 147
   Buffers: shared hit=3
@@ -15,10 +15,10 @@ Seq Scan on exercise_names  (cost=0.00..4.84 rows=1 width=30) (actual time=0.008
 Query: SELECT "public"."exercises"."id", "public"."exercises"."name" FROM "public"."exercises" WHERE "public"."exercises"."id" IN (NULL) OFFSET $1
 Parameters: $1 = '0'
 
-Result  (cost=0.00..0.00 rows=0 width=0) (actual time=0.000..0.001 rows=0 loops=1)
+Result  (cost=0.00..0.00 rows=0 width=0) (actual time=0.001..0.001 rows=0 loops=1)
   One-Time Filter: false
 
-## Statement 3: 0.272 ms
+## Statement 3: 0.281 ms
 Query: SELECT q.key, s.name
       FROM unnest($1::text[]) AS q(key)
       CROSS JOIN LATERAL (
@@ -32,31 +32,31 @@ Query: SELECT q.key, s.name
       ) s
 Parameters: $1 = '{"bench pres"}', $2 = '3'
 
-Nested Loop  (cost=6.69..6.72 rows=1 width=46) (actual time=0.270..0.271 rows=3 loops=1)
-  Buffers: shared hit=7
-  ->  Function Scan on unnest q  (cost=0.00..0.01 rows=1 width=32) (actual time=0.003..0.003 rows=1 loops=1)
-  ->  Limit  (cost=6.69..6.69 rows=1 width=18) (actual time=0.266..0.267 rows=3 loops=1)
-        Buffers: shared hit=7
-        ->  Sort  (cost=6.69..6.69 rows=1 width=18) (actual time=0.266..0.266 rows=3 loops=1)
+Nested Loop  (cost=6.69..6.72 rows=1 width=46) (actual time=0.278..0.280 rows=3 loops=1)
+  Buffers: shared hit=10
+  ->  Function Scan on unnest q  (cost=0.00..0.01 rows=1 width=32) (actual time=0.005..0.005 rows=1 loops=1)
+  ->  Limit  (cost=6.69..6.69 rows=1 width=18) (actual time=0.272..0.273 rows=3 loops=1)
+        Buffers: shared hit=10
+        ->  Sort  (cost=6.69..6.69 rows=1 width=18) (actual time=0.272..0.272 rows=3 loops=1)
               Sort Key: (max(similarity((n.name_key)::text, q.key))) DESC, e.name
               Sort Method: quicksort  Memory: 25kB
-              Buffers: shared hit=7
-              ->  GroupAggregate  (cost=6.65..6.68 rows=1 width=18) (actual time=0.231..0.246 rows=5 loops=1)
+              Buffers: shared hit=10
+              ->  GroupAggregate  (cost=6.65..6.68 rows=1 width=18) (actual time=0.233..0.248 rows=5 loops=1)
                     Group Key: e.name
                     Buffers: shared hit=4
-                    ->  Sort  (cost=6.65..6.66 rows=1 width=28) (actual time=0.223..0.224 rows=12 loops=1)
+                    ->  Sort  (cost=6.65..6.66 rows=1 width=28) (actual time=0.225..0.226 rows=12 loops=1)
                           Sort Key: e.name
                           Sort Method: quicksort  Memory: 25kB
                           Buffers: shared hit=4
-                          ->  Hash Join  (cost=4.85..6.64 rows=1 width=28) (actual time=0.206..0.213 rows=12 loops=1)
+                          ->  Hash Join  (cost=4.85..6.64 rows=1 width=28) (actual time=0.210..0.218 rows=12 loops=1)
                                 Hash Cond: (e.id = n.exercise_id)
                                 Buffers: shared hit=4
                                 ->  Seq Scan on exercises e  (cost=0.00..1.57 rows=57 width=30) (actual time=0.002..0.004 rows=57 loops=1)
                                       Buffers: shared hit=1
-                                ->  Hash  (cost=4.84..4.84 rows=1 width=30) (actual time=0.196..0.196 rows=12 loops=1)
+                                ->  Hash  (cost=4.84..4.84 rows=1 width=30) (actual time=0.201..0.202 rows=12 loops=1)
                                       Buckets: 1024  Batches: 1  Memory Usage: 9kB
                                       Buffers: shared hit=3
-                                      ->  Seq Scan on exercise_names n  (cost=0.00..4.84 rows=1 width=30) (actual time=0.015..0.192 rows=12 loops=1)
+                                      ->  Seq Scan on exercise_names n  (cost=0.00..4.84 rows=1 width=30) (actual time=0.005..0.196 rows=12 loops=1)
                                             Filter: ((name_key)::text % q.key)
                                             Rows Removed by Filter: 135
                                             Buffers: shared hit=3
