@@ -121,6 +121,11 @@ describe('Platform behaviour (e2e)', () => {
       expect(headers).toEqual([false]);
     });
 
+    it('shows how long each request took in Swagger UI', async () => {
+      const res = await request(app.getHttpServer()).get('/docs/swagger-ui-init.js').expect(200);
+      expect(res.text).toMatch(/"displayRequestDuration":\s*true/);
+    });
+
     it('lists the weight-unit registry as the unit enum everywhere (adding a unit is one entry, X1)', async () => {
       const res = await request(app.getHttpServer()).get('/docs-json').expect(200);
       const document = res.body as {
