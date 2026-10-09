@@ -319,7 +319,45 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   - The query inventory is corrected, and a "plateau" scenario plus task T5 cover the unbounded tie query.
   - Ids come from the seeded PRNG and dates from a fixed anchor.
   - Statistics are added only on a misestimate of 10× or more that makes the plan worse.
-- **Commit:** none yet (plan stage).
+- **Commit:** `faf6580` (this entry). The plan itself is git-ignored; the implementation follows rev. 2
+  (`46bc352` … `682db8c`).
+
+### C24 — M7 implementation: plan deviation, uncommitted evidence and overstated claims (2026-10-09, M7 review)
+- **AI output:** The first M7 implementation and its write-up had these problems:
+  - **It did not follow the approved plan.** M7-A said `perf-single` is measured on its own. The AI seeded it with
+    the main dataset and measured everything with it in the table. The seed also never deleted optional users, so
+    a plain re-seed could not remove it.
+  - **It quoted numbers from a run that was never committed.** The D13 estimates (39,476 / 49,256) came from an
+    earlier run whose output was overwritten. "Within 2.3×" was false for committed plans (P4 3.6×, P6 689 vs 0).
+  - **It reported targets selectively.** A cold read statement at 84 ms, over the 50 ms DB target set in the plan,
+    was marked ✅. "Two unused indexes" was actually six. The bulk POST was described as two statements; the plan
+    shows five.
+  - **Test and fixture problems.** The parser fixture called "a real notice" had been edited. One test could not
+    fail: "independent of other users" generated the same spec twice.
+  - **Code defects.**
+    - Set ids within an entry were random, while the API's ascend with the set number.
+    - Every Bitmap Index Scan was counted as a big-table scan.
+    - Scenarios were hard-coded beside the profile and only checked HTTP status.
+    - POST scenarios ran before the `perf-single` ones.
+    - `idx_scan` was read before backends flushed their statistics.
+  - Earlier in the same milestone, the raw plan of the max bulk POST was 2 MB because all ~60,000 bind
+    parameters were printed (`e7119ab`).
+- **How detected:** The independent `technical-leader` review of the branch. It checked every number in
+  PERFORMANCE.md against `docs/perf/`, grepped the committed files for the quoted estimates, re-parsed all 282 scan
+  lines of the raw plans, and counted `perf-single` rows in the database.
+- **Outcome:**
+  - Each defect was fixed test-first in its own commit: the seed deletes every profile user, set ids ascend,
+    bitmap scans are attributed to their table, a real fixture is used plus edge cases, and a golden fingerprint
+    plus an independence test that can fail.
+  - The scripts were fixed: scenarios come from the profile and assert their content, writes run last, `--only`
+    is added, and statistics are flushed before reading.
+  - Everything was re-measured as approved: the main dataset (cold, warm, latency), then `perf-single` alone.
+  - PERFORMANCE.md and DESIGN were rewritten from committed numbers only. The targets are copied verbatim, with the
+    cold miss stated (61 ms).
+  - New rule followed from here on: a number in a document must come from a committed artifact or be marked as
+    command output.
+- **Commit:** `e7119ab`, `cba660d` + `7bf43ae`, `9da8126` + `3cbb15e`, `5799a36`, `b28a09f` + `89741e7`,
+  `2e38219`, `d275043`, `05c2552`, `fa59066`.
 
 ## 4. Rejected AI suggestions
 
