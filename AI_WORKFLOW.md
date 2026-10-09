@@ -296,6 +296,31 @@ Entries are added as events happen (not reconstructed at the end). Dates are loc
   ahead, 23 h accepted, 25 h rejected). One global `CLOCK` provider now serves POST and compare.
 - **Commit:** `5b98ad7`, `1769845` (helper), `9bedcc8` (e2e tests), `98b72f1` (POST rule), `fade932` (docs).
 
+### C23 — M7 plan: wrong measurement method, incomplete query inventory, unbounded tie query missed (2026-10-08, M7 analysis)
+- **AI output:** The first M7 plan (performance evidence) had five problems:
+  - It captured Prisma's SQL and re-ran `EXPLAIN ANALYZE` on it.
+  - It measured latency from inside the same process that serves the API.
+  - It listed the lookup helpers as one query each.
+  - It assumed the perf seed takes about 1 minute.
+  - It would have added extended statistics whenever a PR query used a Seq Scan.
+  It also generated ids with `uuidv7()` and dates relative to now, while claiming the dataset was deterministic.
+- **How detected:** I asked for a review before approving the plan. The `technical-leader` subagent ran spikes on
+  a throwaway database:
+  - Query events stringify every parameter into one JSON array (the `uuid[]` type is lost), and re-running
+    inserts under EXPLAIN ANALYZE would write rows.
+  - Prisma 7.10 runs a nested relation `select` as a separate statement.
+  - The tie-overflow query in records has no LIMIT: 66,668 tied sets took 73 ms plus 412 ms to load.
+  - The seed ran at about 8.9k rows/s.
+  - On a single-user table the planner chose a Seq Scan with an accurate estimate, and `CREATE STATISTICS` did
+    not change it.
+- **Outcome:** Plan rev. 2:
+  - Plans are now captured with `auto_explain` notices on a dedicated pool, calling the real services.
+  - Latency is measured against a separately running API.
+  - The query inventory is corrected, and a "plateau" scenario plus task T5 cover the unbounded tie query.
+  - Ids come from the seeded PRNG and dates from a fixed anchor.
+  - Statistics are added only on a misestimate of 10× or more that makes the plan worse.
+- **Commit:** none yet (plan stage).
+
 ## 4. Rejected AI suggestions
 
 | Date | Decision | AI suggested | I decided | Reason |
