@@ -48,7 +48,7 @@ If ports 3000 or 5432 are taken on your machine: `API_PORT=3100 POSTGRES_PORT=54
 nvm use                  # Node 24.21.0 (.nvmrc)
 npm ci
 docker compose up -d postgres migrate
-cp .env.example .env     # DATABASE_URL points at the compose Postgres on localhost:5432
+cp .env.example .env     # DATABASE_URL points at the compose Postgres on localhost:5432 (adjust if POSTGRES_PORT is set)
 npm run start:dev
 ```
 
@@ -81,7 +81,7 @@ flowchart LR
       MW --> CTRL["Controllers<br/>DTO validation (ValidationPipe)"]
       CTRL --> SVC["Services<br/>business rules, transactions"]
       SVC --> DOM["Pure domain (no Nest)<br/>units, Epley/volume, time ranges,<br/>PR ranking, cursor codec"]
-      SVC --> REPO["Repositories<br/>Prisma client + 2 typed raw queries"]
+      SVC --> REPO["Repositories<br/>Prisma client + 2 typed raw queries<br/>(plus the health ping)"]
       EF["Global exception filter<br/>one error envelope"] -.-> C
     end
     REPO --> PG[("PostgreSQL 16<br/>pg_trgm")]
@@ -238,7 +238,9 @@ Pass `exercise`, `unit` and `tz`, plus **either**:
 
 Each period's record is the best set inside that period. `delta.<metric>` is `{ absolute, percent, improved }`, or
 `null` when either side has no record. For September vs August 2026 in Hanoi, after an extra 95 kg × 3 set logged
-on 20 August:
+on 20 August, the query
+`?exercise=Bench%20Press&tz=Asia/Ho_Chi_Minh&currentFrom=2026-09-01&currentTo=2026-09-30&previousFrom=2026-08-01&previousTo=2026-08-31`
+returns:
 
 ```json
 { "data": { "current":  { "from": "2026-08-31T17:00:00.000Z", "to": "2026-09-30T16:59:59.999Z", "maxWeight": { "value": 100, … }, … },
@@ -284,8 +286,8 @@ Detail codes in `error.details[].code`:
 
 **Validation runs in two stages.** First the request's shape is checked (types, ranges, required fields). Then its
 meaning is checked: dates, time zones, catalog names, idempotency. If the first stage fails, its problems are
-reported and the second stage does not run. The example above therefore does not report the misspelled name or the
-missing offset yet.
+reported and the second stage does not run. For example, a request that also misspelled the exercise name or sent a
+datetime without an offset would report those problems only once the shape errors above are fixed.
 
 ## 4. Data model
 
@@ -349,7 +351,7 @@ erDiagram
 | `workout_entries (user_id, exercise_id, performed_at DESC, id DESC)` | History filtered by name or muscle group: one `LATERAL` scan per matched exercise (M5-A) |
 | `workout_sets (user_id, exercise_id, performed_at, weight_kg, reps, volume_kg, e1rm_kg, id)` | PRs and compare. A covering index, so Index Only Scans with 0 heap fetches (D10); date-ordered, so ranges stay cheap |
 | `workout_sets (entry_id, set_number)` unique | The sets of one history page in a single query; set order |
-| `exercise_names (name_key)` PK + GIN `gin_trgm_ops` | Exact name lookup; partial match and "did you mean" suggestions |
+| `exercise_names (name_key)` PK + GIN `gin_trgm_ops` | Exact name lookup; partial match and "did you mean" suggestions. With ~150 names the planner prefers a Seq Scan today; the indexes matter as the catalog grows |
 | `exercise_muscle_groups (muscle_group_code, exercise_id)` | Muscle-group filter |
 | `idempotency_keys (user_id, key)` PK | Idempotent replays and the race between concurrent retries |
 
@@ -443,7 +445,8 @@ The full evidence is in [docs/PERFORMANCE.md](docs/PERFORMANCE.md). It covers:
 |---|---:|
 | History, any filter, any page depth | ≤ 6.1 ms |
 | PRs, the most-logged exercise (53k weighted sets) | 31.0 ms |
-| PRs, background users with 2k entries / exercises ranked 4–15 by frequency | 7.7 ms / 20.5 ms |
+| PRs, background users with 2k entries | 7.7 ms |
+| PRs, `perf-heavy` exercises ranked 4–15 by frequency | 20.5 ms |
 | Compare | 7.8 ms |
 | POST one entry / 100 entries × 50 sets | 4.4 ms / 328 ms |
 
@@ -476,10 +479,15 @@ Known limits, all measured:
   - Compare adds `meta.message` only when **both** periods are empty. A single empty side shows as `null` records
     and `null` deltas.
 
-**10,000 concurrent coaches.** Today's numbers, on 2 vCPUs, give rough estimates. Each is computed as
-concurrency ÷ p50 of a measured batch of 20, so treat them as estimates, not benchmarks:
-- History: about 20 / 29.6 ms ≈ 675 requests/s.
-- PRs on the largest exercise: about 20 / 476 ms ≈ 42 requests/s.
+**10,000 concurrent coaches.** Today's measurements give a rough capacity on 2 vCPUs. They come from closed-loop
+batches of 20 parallel requests, and each batch lasts as long as its slowest request, so throughput is about
+20 ÷ the slowest latency. These are estimates, not load tests:
+- History, first page: 20 / 75.9 ms (max of the batches in `docs/perf/latency-warm.md`) ≈ 260 requests/s.
+- PRs on the largest exercise: 20 / 491 ms (p95; command output) ≈ 40 requests/s.
+
+**Assumption, not measured:** an active coach makes about one request every 5 seconds. Then 10,000 concurrent
+coaches send about 2,000 requests/s: roughly 8× the measured history capacity and 50× the heaviest PR case on this
+machine.
 
 What would change, in order of impact:
 1. **Authentication and tenancy.** Coaches may only access their own clients. This is required before anything
