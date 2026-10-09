@@ -16,7 +16,7 @@ The git log and `AI_WORKFLOW.md` are deliverables. Follow "AI adoption rules" be
 - Prisma **7.10.0, pinned exact** (npm `latest` is an 8.0 RC) with `@prisma/adapter-pg` and `prisma.config.ts`;
   exposed through a `PrismaService` provider. Use the Prisma client by default. Only two typed raw queries
   (`$queryRaw` / TypedSQL, always parameterized): the history keyset page (Prisma's native cursor is O(depth))
-  and `similarity()` name suggestions
+  and `similarity()` name suggestions (plus the `SELECT 1` health ping)
 - Index needs Prisma can't express (e.g. `INCLUDE`) are replaced by key columns. SQL Prisma cannot express at all
   (CHECK constraints, statistics) is hand-added to a new `--create-only` migration before it is applied; an applied
   migration is never edited
@@ -114,7 +114,8 @@ docs/adr/        # short architecture decision records
 - Integration tests cover each endpoint's happy path, validation errors, empty ranges, pagination continuity, and
   concurrent bulk writes.
 - Test names describe behaviour ("returns earliest date when two sets tie on max weight").
-- Run `npm run lint && npm run typecheck && npm test` before every commit; report the actual output.
+- Run `npm run lint && npm run typecheck && npm test` before every commit; report the actual output. A deliberate red
+  test commit is the exception: it fails `npm test` (and `typecheck` if it imports a symbol not written yet).
 
 ## Git
 
