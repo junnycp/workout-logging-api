@@ -141,6 +141,28 @@ describe('Platform behaviour (e2e)', () => {
       expect(headers).toEqual([false]);
     });
 
+    it('documents every error status each API route can return', async () => {
+      const res = await request(app.getHttpServer()).get('/docs-json').expect(200);
+      const paths = (res.body as { paths: Record<string, Record<string, { responses: object }>> })
+        .paths;
+      const statuses = (path: string, method: string) =>
+        Object.keys(paths[path]?.[method]?.responses ?? {}).sort();
+      expect(statuses('/api/v1/users/{userId}/workouts', 'post')).toEqual(
+        ['200', '201', '400', '409', '413', '415', '500'].sort(),
+      );
+      expect(statuses('/api/v1/users/{userId}/workouts', 'get')).toEqual(['200', '400', '500']);
+      expect(statuses('/api/v1/users/{userId}/personal-records', 'get')).toEqual([
+        '200',
+        '400',
+        '500',
+      ]);
+      expect(statuses('/api/v1/users/{userId}/personal-records/compare', 'get')).toEqual([
+        '200',
+        '400',
+        '500',
+      ]);
+    });
+
     it('shows how long each request took in Swagger UI', async () => {
       const res = await request(app.getHttpServer()).get('/docs/swagger-ui-init.js').expect(200);
       expect(res.text).toMatch(/"displayRequestDuration":\s*true/);
